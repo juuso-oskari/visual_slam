@@ -3,6 +3,7 @@ import cv2
 import time
 import os 
 from pathlib import Path
+import re
 
 class FeatureExtractor:
     def __init__(self):
@@ -35,8 +36,8 @@ if __name__=="__main__":
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
     if is_WINDOWS:
-        dir_rgb = cur_dir + "\visual_slam\data\ICL_NUIM\rgb\"
-        dir_depth = cur_dir + "\visual_slam\data\ICL_NUIM\depth\"
+        dir_rgb = re.sub("/", "\\", dir_rgb)
+        dir_depth = re.sub("/", "\\", dir_depth)
 
     feature_extractor = FeatureExtractor()
 
