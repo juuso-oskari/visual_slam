@@ -30,14 +30,13 @@ class Frame:
         
 
 if __name__=="__main__":
-
     cur_dir = str(Path(os.path.dirname(os.path.realpath(__file__))).parents[1])
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
     if is_WINDOWS:
-        dir_rgb = re.sub("/", "\\", dir_rgb)
-        dir_depth = re.sub("/", "\\", dir_depth)
+        dir_rgb = dir_rgb.replace("/", "\\")
+        dir_depth = dir_depth.replace("/", "\\")
 
     feature_extractor = FeatureExtractor()
 
