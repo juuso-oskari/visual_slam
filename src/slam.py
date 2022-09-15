@@ -1,7 +1,8 @@
 import numpy as np
 import cv2
 import time
-
+import os 
+from pathlib import Path
 
 class FeatureExtractor:
     def __init__(self):
@@ -32,8 +33,10 @@ class Frame:
 
 
 if __name__=="__main__":
-    dir_rgb = "../data/ICL_NUIM/rgb/"
-    dir_depth = "../data/ICL_NUIM/depth/"
+
+    cur_dir = str(Path(os.path.dirname(os.path.realpath(__file__))).parents[1])
+    dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
+    dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
 
     feature_extractor = FeatureExtractor()
 
