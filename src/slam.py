@@ -15,7 +15,6 @@ class FeatureExtractor:
 
 class FeatureMatcher():
     def __init__(self):
-        #self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         self.matcher = cv2.BFMatcher()
     def match_features(self, frame_cur, frame_prev):
         kp1, feat1 = frame_cur.keypoints, frame_cur.features
@@ -27,12 +26,7 @@ class FeatureMatcher():
         for m,n in matches:
             if m.distance < 0.01*n.distance:
                 good.append([m])
-        # Sort them in the order of their distance.
-        #matches = sorted(matches, key = lambda x:x.distance)
         return good
-
-
-
 
 
 class Frame:
@@ -82,7 +76,6 @@ if __name__=="__main__":
         # Feature Matching to previous frame
         matches = feature_matcher.match_features(cur_frame, prev_frame)    
         # Display
-        #img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,good,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints,cur_frame.rgb,cur_frame.keypoints,matches,None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
         cv2.imshow('a', img3)
