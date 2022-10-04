@@ -4,7 +4,7 @@ import time
 import os 
 from pathlib import Path
 import re
-   
+
 class FeatureExtractor:
     def __init__(self):
         self.extractor = cv2.SIFT_create()
@@ -19,7 +19,7 @@ class FeatureExtractor:
         #return kp, des
 
 
-class FeatureMatcher:
+class FeatureMatcher():
     def __init__(self):
         self.matcher = cv2.BFMatcher()
     def match_features(self, frame_cur, frame_prev):
@@ -55,6 +55,7 @@ class FeatureMatcher:
         return np.array(matches)[id_nnd]
 
 
+
 class Frame:
     def __init__(self, rgb_fp, d_path, feature_extractor):
         self.rgb = cv2.imread(rgb_fp)
@@ -68,7 +69,6 @@ class Frame:
     def feature_extract(self, rgb):
         return self.feature_extractor.compute_features(rgb)
         
-        
 
 if __name__=="__main__":
     # Filepaths
@@ -80,9 +80,9 @@ if __name__=="__main__":
         dir_rgb = dir_rgb.replace("/", "\\")
         dir_depth = dir_depth.replace("/", "\\")
     # Initialize
+    print(dir_rgb)
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
-    K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     # run feature extraction for 1st image
     fp_rgb = dir_rgb + str(1) + ".png"
     fp_depth = dir_depth + str(1) + ".png"
@@ -98,7 +98,7 @@ if __name__=="__main__":
             cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
             kp, features, rgb = cur_frame.process_frame()
             # Feature Matching to previous frame
-            matches = feature_matcher.match_features(cur_frame, prev_frame) 
+            matches = feature_matcher.match_features(cur_frame, prev_frame)    
             # Display
             img3 = cv2.drawMatchesKnn(cur_frame.rgb,cur_frame.keypoints,prev_frame.rgb,prev_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
