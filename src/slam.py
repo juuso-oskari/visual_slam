@@ -1,5 +1,7 @@
 import numpy as np
+import g2o
 import cv2
+
 import time
 import os 
 from pathlib import Path
@@ -80,7 +82,6 @@ if __name__=="__main__":
         dir_rgb = dir_rgb.replace("/", "\\")
         dir_depth = dir_depth.replace("/", "\\")
     # Initialize
-    print(dir_rgb)
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
     # run feature extraction for 1st image
