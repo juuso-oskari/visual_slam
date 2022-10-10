@@ -53,3 +53,4 @@ class BundleAdjustment(g2o.SparseOptimizer):
         return self.vertex(point_id * 2 + 1).estimate()
 
 print("prööt")
+print("Hector")
