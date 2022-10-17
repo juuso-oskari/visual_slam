@@ -1,5 +1,5 @@
 data/rgbd_dataset_freiburg1_xyz
 data/rgbd_dataset_freiburg2_xyz
-venv/
+.venv_old
 data/
 src/testing.ipynb
