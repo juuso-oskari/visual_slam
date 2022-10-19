@@ -173,11 +173,11 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         #validFraction = np.sum(inliers) / len(inliers)
         #return R, t, validFraction 
         # decompose essential matrix into 4 possible solutions
-        #R1, R2, t = cv2.decomposeEssentialMat(tform)
+        R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
-        #R1, R2, t = R1[np.newaxis,:], R2[np.newaxis,:], t[np.newaxis,:]
-        #Rs = np.concatenate((R1, R1, R2, R2), axis=0)
-        #Ts = np.concatenate((t,-t,t,-t))
+        R1, R2, t = R1[np.newaxis,:], R2[np.newaxis,:], t[np.newaxis,:]
+        Rs = np.concatenate((R1, R1, R2, R2), axis=0)
+        Ts = np.concatenate((t,-t,t,-t))
         # choose realizable solutions according to cheirality check
         R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
         if np.shape(R)[0] >= 2:
