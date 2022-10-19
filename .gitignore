@@ -1,8 +1,5 @@
 data/rgbd_dataset_freiburg1_xyz
 data/rgbd_dataset_freiburg2_xyz
-.venv/
-data/
-src/testing.ipynb
-src/v1/__pycache__
+data/ICL_NUIM
 src/__pycache__
 src/.ipynb_checkpoints
