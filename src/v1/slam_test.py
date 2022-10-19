@@ -8,6 +8,13 @@ import time
 import os 
 from pathlib import Path
 import re
+from viewer import Viewer
+from mpl_toolkits import mplot3d
+import matplotlib.pyplot as plt
+import pandas as pd
+
+
+
 import matplotlib.pyplot as plt
 
 from viewer import Viewer
@@ -100,7 +107,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False

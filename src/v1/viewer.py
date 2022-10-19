@@ -216,3 +216,4 @@ class DynamicArray(object):
     def __iter__(self):
         for x in self.data[:self.ind]:
             yield x
+
