@@ -100,7 +100,10 @@ def triangulateMidPoint(points1, points2, P1, P2):
     #u2 = [points2, ones(numPoints, 1, 'like', points1)]'
     a1 = np.linalg.lstsq(M1, u1.T, rcond=None)[0]
     a2 = np.linalg.lstsq(M2, u2.T, rcond=None)[0]
-    #isCodegen  = ~isempty(coder.target);
+    
+    print(numPoints)
+    print(np.shape(a1))
+    
     condThresh = 2**(-52)
     for i in range(numPoints):
         A   = np.array([a1[:,i], -a2[:,i]]).T 

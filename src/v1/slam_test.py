@@ -11,7 +11,7 @@ import re
 from viewer import Viewer
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-import pandas as pd
+#import pandas as pd
 
 
 
@@ -107,7 +107,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -155,7 +155,7 @@ if __name__=="__main__":
             tform = H
             inliers = inliersH
             tform_type = "Homography"
-            if sum(inliersH) < 1000: #sum(inliersE):
+            if sum(inliersH) < sum(inliersE):
                 #print("Chose Essential")
                 tform = E
                 inliers = inliersE
