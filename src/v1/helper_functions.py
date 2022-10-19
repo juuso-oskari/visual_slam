@@ -116,18 +116,43 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Homog
         
     elif tform_type == "Essential":
         # recoverpose way:
-        # points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
-        # validFraction = np.sum(inliers) / len(inliers) 
+        print(np.shape(inlier_pts1))
+        points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
+        print(R)
+        validFraction = np.sum(inliers) / len(inliers) 
         # decompose essential matrix into 4 possible solutions
-        R1, R2, t = cv2.decomposeEssentialMat(tform)
+        #R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
-        R1, R2, t = R1[np.newaxis,:], R2[np.newaxis,:], t[np.newaxis,:]
-        Rs = np.concatenate((R1, R1, R2, R2), axis=0)
-        Ts = np.concatenate((t,-t,t,-t))
+        #R1, R2, t = R1[np.newaxis,:], R2[np.newaxis,:], t[np.newaxis,:]
+        #Rs = np.concatenate((R1, R1, R2, R2), axis=0)
+        #Ts = np.concatenate((t,-t,t,-t))
         # choose realizable solutions according to cheirality check
-        R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
+        #R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
         return R[0], t[0], validFraction
     else:
         print("Unknown tform_type")
         return None, None
-        
+    
+def triangulation(kp1, kp2, T_1w, T_2w):
+    """Triangulation to get 3D points
+    Initial version of trigualation
+    Might be error prone
+    Args:
+        kp1 (Nx2): inlier keypoint in view 1 (normalized)
+        kp2 (Nx2): inlier keypoints in view 2 (normalized)
+        T_1w (4x4): pose of view 1 w.r.t  i.e. T_1w (from w to 1)
+        T_2w (4x4): pose of view 2 w.r.t world, i.e. T_2w (from w to 2)
+    Returns:
+        X (3xN): 3D coordinates of the keypoints w.r.t world coordinate
+        X1 (3xN): 3D coordinates of the keypoints w.r.t view1 coordinate
+        X2 (3xN): 3D coordinates of the keypoints w.r.t view2 coordinate
+    """
+    kp1_3D = np.ones((3, kp1.shape[0]))
+    kp2_3D = np.ones((3, kp2.shape[0]))
+    kp1_3D[0], kp1_3D[1] = kp1[:, 0].copy(), kp1[:, 1].copy()
+    kp2_3D[0], kp2_3D[1] = kp2[:, 0].copy(), kp2[:, 1].copy()
+    X = cv2.triangulatePoints(T_1w[:3], T_2w[:3], kp1_3D[:2], kp2_3D[:2])
+    X /= X[3]
+    X1 = T_1w[:3] @ X
+    X2 = T_2w[:3] @ X
+    return X[:3], X1, X2

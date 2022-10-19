@@ -8,6 +8,13 @@ import time
 import os 
 from pathlib import Path
 import re
+from viewer import Viewer
+from mpl_toolkits import mplot3d
+import matplotlib.pyplot as plt
+import pandas as pd
+
+
+
 
 class FeatureExtractor:
     def __init__(self):
@@ -71,7 +78,27 @@ class Frame:
         
     def feature_extract(self, rgb):
         return self.feature_extractor.compute_features(rgb)
-        
+
+class Isometry3d(object):
+    """3d rigid transform."""
+
+    def __init__(self, R, t):
+        self.R = R
+        self.t = t
+
+    def matrix(self):
+        m = np.identity(4)
+        m[:3, :3] = self.R
+        m[:3, 3] = self.t
+        return m
+
+    def inverse(self):
+        return Isometry3d(self.R.T, -self.R.T @ self.t)
+
+    def __mul__(self, T1):
+        R = self.R @ T1.R
+        t = self.R @ T1.t + self.t
+        return Isometry3d(R, t)      
 
 if __name__=="__main__":
     # Global variables
@@ -81,7 +108,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -91,7 +118,7 @@ if __name__=="__main__":
     # Initialize
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
-    trajectory = (np.array([[0, 0, 0]])) # camera trajectory for visualization
+    trajectory = [np.array([0, 0, 0])] # camera trajectory for visualization
     pose = np.eye(4)
     # run feature extraction for 1st image
     fp_rgb = dir_rgb + str(1) + ".png"
@@ -100,115 +127,90 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     # create view
-    pangolin.CreateWindowAndBind('Main', 640, 480)
-    gl.glEnable(gl.GL_DEPTH_TEST)
-    # Define Projection and initial ModelView matrix
-    scam = pangolin.OpenGlRenderState(
-        pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 200),
-        pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
-    
-    posegl = pangolin.OpenGlMatrix()
-    posegl.m = pose
-    
-    scam.Follow(posegl, True)
-    handler = pangolin.Handler3D(scam)
-
-    # Create Interactive View in window
-    dcam = pangolin.CreateDisplay()
-    dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
-    dcam.SetHandler(handler)
+    viewer = Viewer()
 
 
-    while not pangolin.ShouldQuit():
+    ii = 0
     
-        for i in range(2,1000):
-            if i % 1 == 0:
-                fp_rgb = dir_rgb + str(i) + ".png"
-                fp_depth = dir_depth + str(i) + ".png"
-                # Feature Extraction for current frame
-                cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
-                kp, features, rgb = cur_frame.process_frame()
-                # Feature Matching to previous frame
-                matches = feature_matcher.match_features(prev_frame, cur_frame)    
-                # if not enough matches (<100) continue to next frame
-                if(len(matches) < 100):
-                    print("too few matches")
-                    continue
-                # match and normalize keypoints
-                preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
-                # compute homography and inliers
-                H, inliersH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh= K[0,0]) # ransac threshold as last argument
-                # compute essential and inliers
-                E, inliersE  = estimateEssential(preMatchedPoints, curMatchedPoints, essTh=K[0,0])
-                # choose between models based on number of inliers
-                # https://www.programcreek.com/python/example/70413/cv2.RANSAC
-                tform = H
-                inliers = inliersH
-                tform_type = "Homography"
-                if sum(inliersH) < sum(inliersE):
-                    print("Chose Essential")
-                    tform = E
-                    inliers = inliersE
-                    tform_type = "Essential"
-                else:
-                    print("chose Homography")
-                # if number of inliers with the better model too low continue to next frame
-                if sum(inliers) < 100:
-                    print("too few inliers")
-                    continue
-                # else continue with the inliers
-                inlierPrePoints = preMatchedPoints[inliers]
-                inlierCurrPoints = curMatchedPoints[inliers]
-                # get pose transformation (use only half of the points for faster computation)
-                R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
-                # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
-                print(np.shape(R))
-                print(np.shape(t.T))
-                RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
-                pose = RelativePoseTransformation @ pose
-                posegl.m = pose
-                scam.Follow(posegl, True)
-                #print(np.shape(pose[:3,3]))
-                new_xyz = trajectory[-1] + pose[:3,3]
-                
-                trajectory = np.concatenate((trajectory, new_xyz[np.newaxis,:]), axis=0)
-                
-                # Draw trajectory
-                #gl.glLineWidth(1)
-                gl.glPointSize(8)
-                gl.glColor3f(0.0, 1.0, 0.0)
-                #pangolin.DrawLine(trajectory)   # consecutive
-                #gl.glColor3f(0.0, 1.0, 0.0)
-                
-                pangolin.DrawPoints(trajectory)  # separate
-                # Draw current pose
-                gl.glLineWidth(1)
-                gl.glColor3f(0.0, 0.0, 1.0)
-                pangolin.DrawCamera(pose, 0.3)
-                """
-                print("Rotation: ")
-                print(R)
-                print("Translation: ")
-                print(t)
-                
-                print("valid fraction: ")
-                print(validFraction)
-                print("number of solutions: ")
-                print(len(r))
-                """
-                
-                # TODO: triangulate two view to obtain 3-D map points
-                
-                
-                # Display
-                #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-                #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
-                #cv2.imshow('a', img3)
-                #cv2.waitKey(0)
-                #
-                pangolin.FinishFrame()
-                
-                
-                
-                
-                prev_frame = cur_frame
+    for i in range(2,1240):
+        if i % 25 == 0:
+            fp_rgb = dir_rgb + str(i) + ".png"
+            fp_depth = dir_depth + str(i) + ".png"
+            # Feature Extraction for current frame
+            cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
+            kp, features, rgb = cur_frame.process_frame()
+            # Feature Matching to previous frame
+            matches = feature_matcher.match_features(prev_frame, cur_frame)    
+            # if not enough matches (<100) continue to next frame
+            #if(len(matches) < 100):
+                #print("too few matches")
+                #continue
+            # match and normalize keypoints
+            preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
+            # compute homography and inliers
+            H, inliersH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh= K[0,0]) # ransac threshold as last argument
+            # compute essential and inliers
+            E, inliersE  = estimateEssential(preMatchedPoints, curMatchedPoints, essTh=K[0,0])
+            # choose between models based on number of inliers
+            # https://www.programcreek.com/python/example/70413/cv2.RANSAC
+            tform = H
+            inliers = inliersH
+            tform_type = "Homography"
+            '''
+            if sum(inliersH) < 1000: # sum(inliersE):
+                print("Chose Essential")
+                tform = E
+                inliers = inliersE
+                tform_type = "Essential"
+            else:
+                print("chose Homography")
+            # if number of inliers with the better model too low continue to next frame
+            if sum(inliers) < 100:
+                print("too few inliers")
+                continue
+            '''
+            # else continue with the inliers
+            inlierPrePoints = preMatchedPoints[inliers]
+            inlierCurrPoints = curMatchedPoints[inliers]
+            # get pose transformation (use only half of the points for faster computation)
+            #R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
+            # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+            #print(np.shape(R))
+            #print(np.shape(preMatchedPoints))
+            #print(np.shape(t.T))
+            points, R_est, t_est, mask_pose = cv2.recoverPose(E, preMatchedPoints, curMatchedPoints, cameraMatrix=K)
+
+            T = Isometry3d(R=R_est, t=np.squeeze(t_est)).inverse().matrix()
+            #RelativePoseTransformation = np.hstack((R_est, t_est))
+            #print(RelativePoseTransformation)
+            #RelativePoseTransformation = np.vstack((RelativePoseTransformation,np.array([0,0,0,1])))
+            #RelativePoseTransformation = np.linalg.inv(RelativePoseTransformation)
+            #print(np.shape(RelativePoseTransformation))
+            pose = T @ pose
+            #print(np.shape(pose[:3,3]))
+            #new_xyz = trajectory[-1] + pose[:3,3]
+
+            trajectory.append(pose[:3,3])
+        
+            viewer.update_pose(pose=g2o.Isometry3d(pose))
+            
+            # TODO: triangulate two view to obtain 3-D map points
+            
+            
+            # Display
+            #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
+            #cv2.imshow('a', img3)
+            #cv2.waitKey(0)
+            #            
+            ii = ii+1
+            print(ii)
+            prev_frame = cur_frame
+    viewer.stop()
+
+
+    df = pd.DataFrame(data=trajectory)
+    df.to_csv('trajectory.csv')
+
+    #plt.plot(trajectory[:,0],trajectory[:,1] , '*')
+    #plt.show()
