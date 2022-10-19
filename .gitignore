@@ -1,5 +1,5 @@
 data/rgbd_dataset_freiburg1_xyz
 data/rgbd_dataset_freiburg2_xyz
-data/ICL_NUIM
+.venv_old
+data/
 src/testing.ipynb
-

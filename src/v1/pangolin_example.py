@@ -55,19 +55,13 @@ def main():
         # Draw lines
         gl.glLineWidth(1)
         gl.glColor3f(0.0, 0.0, 0.0)
-        pangolin.DrawLine(trajectory)   # consecutive
-        gl.glColor3f(0.0, 1.0, 0.0)
-        pangolin.DrawLines(
-            trajectory, 
-            trajectory + np.random.randn(len(trajectory), 3), 
-            point_size=5)   # separate
-
+        pangolin.DrawPoints(trajectory)   # consecutive
         # Draw camera
         pose = np.identity(4)
         pose[:3, 3] = np.random.randn(3)
         gl.glLineWidth(1)
         gl.glColor3f(0.0, 0.0, 1.0)
-        pangolin.DrawCamera(pose, 0.3)
+        pangolin.DrawCamera(pose, 0.03)
         """
         # Draw boxes
         poses = [np.identity(4) for i in range(10)]

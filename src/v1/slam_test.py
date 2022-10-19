@@ -15,6 +15,9 @@ import pandas as pd
 
 
 
+import matplotlib.pyplot as plt
+
+from viewer import Viewer
 
 class FeatureExtractor:
     def __init__(self):
@@ -81,24 +84,20 @@ class Frame:
 
 class Isometry3d(object):
     """3d rigid transform."""
-
     def __init__(self, R, t):
         self.R = R
         self.t = t
-
     def matrix(self):
         m = np.identity(4)
         m[:3, :3] = self.R
         m[:3, 3] = self.t
         return m
-
     def inverse(self):
         return Isometry3d(self.R.T, -self.R.T @ self.t)
-
     def __mul__(self, T1):
         R = self.R @ T1.R
         t = self.R @ T1.t + self.t
-        return Isometry3d(R, t)      
+        return Isometry3d(R, t)    
 
 if __name__=="__main__":
     # Global variables
@@ -116,24 +115,20 @@ if __name__=="__main__":
         dir_rgb = dir_rgb.replace("/", "\\")
         dir_depth = dir_depth.replace("/", "\\")
     # Initialize
+    viewer = Viewer()
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
     trajectory = [np.array([0, 0, 0])] # camera trajectory for visualization
-    pose = np.eye(4)
+    poses = [np.eye(4)]
     # run feature extraction for 1st image
     fp_rgb = dir_rgb + str(1) + ".png"
     fp_depth = dir_depth + str(1) + ".png"
     cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
-    # create view
-    viewer = Viewer()
-
-
-    ii = 0
     
-    for i in range(2,1240):
-        if i % 25 == 0:
+    for i in range(2,500):
+        if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
             # Feature Extraction for current frame
@@ -142,23 +137,26 @@ if __name__=="__main__":
             # Feature Matching to previous frame
             matches = feature_matcher.match_features(prev_frame, cur_frame)    
             # if not enough matches (<100) continue to next frame
-            #if(len(matches) < 100):
-                #print("too few matches")
-                #continue
+            if(len(matches) < 100):
+                print("too few matches")
+                continue
             # match and normalize keypoints
             preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
             # compute homography and inliers
-            H, inliersH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh= K[0,0]) # ransac threshold as last argument
+            H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh= K[0,0]) # ransac threshold as last argument
+            print("Homography score: ")
+            print(scoreH)
             # compute essential and inliers
-            E, inliersE  = estimateEssential(preMatchedPoints, curMatchedPoints, essTh=K[0,0])
+            E, inliersE , scoreE = estimateEssential(preMatchedPoints, curMatchedPoints, essTh=K[0,0])
+            print("Essential score: ")
+            print(scoreE)
             # choose between models based on number of inliers
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
             tform = H
             inliers = inliersH
             tform_type = "Homography"
-            '''
-            if sum(inliersH) < 1000: # sum(inliersE):
-                print("Chose Essential")
+            if sum(inliersH) < 1000: #sum(inliersE):
+                #print("Chose Essential")
                 tform = E
                 inliers = inliersE
                 tform_type = "Essential"
@@ -168,32 +166,40 @@ if __name__=="__main__":
             if sum(inliers) < 100:
                 print("too few inliers")
                 continue
-            '''
+                
             # else continue with the inliers
-            inlierPrePoints = preMatchedPoints[inliers]
-            inlierCurrPoints = curMatchedPoints[inliers]
+            inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
+            inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
-            #R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
-            # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+            R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
             #print(np.shape(R))
-            #print(np.shape(preMatchedPoints))
-            #print(np.shape(t.T))
-            points, R_est, t_est, mask_pose = cv2.recoverPose(E, preMatchedPoints, curMatchedPoints, cameraMatrix=K)
-
-            T = Isometry3d(R=R_est, t=np.squeeze(t_est)).inverse().matrix()
-            #RelativePoseTransformation = np.hstack((R_est, t_est))
-            #print(RelativePoseTransformation)
-            #RelativePoseTransformation = np.vstack((RelativePoseTransformation,np.array([0,0,0,1])))
-            #RelativePoseTransformation = np.linalg.inv(RelativePoseTransformation)
-            #print(np.shape(RelativePoseTransformation))
-            pose = T @ pose
-            #print(np.shape(pose[:3,3]))
-            #new_xyz = trajectory[-1] + pose[:3,3]
-
-            trajectory.append(pose[:3,3])
-        
-            viewer.update_pose(pose=g2o.Isometry3d(pose))
+            #print(np.shape(t))
+            #print("estRel")
+            #print(R)
+            #print(t)
+            #points, R, t, inliers = cv2.recoverPose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], cameraMatrix=K)
+            #print("recoverpose")
+            #print(R)
+            #print(t)
+            # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+            #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
+            RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
+            pose = RelativePoseTransformation @ poses[-1]
+            viewer.update_pose(pose = g2o.Isometry3d(pose))
+            poses.append(pose)
+            new_xyz = trajectory[-1] + pose[:3,3]
+            trajectory.append(new_xyz)
+            """
+            print("Rotation: ")
+            print(R)
+            print("Translation: ")
+            print(t)
             
+            print("valid fraction: ")
+            print(validFraction)
+            print("number of solutions: ")
+            print(len(r))
+            """
             # TODO: triangulate two view to obtain 3-D map points
             
             
@@ -201,16 +207,8 @@ if __name__=="__main__":
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
             #cv2.imshow('a', img3)
-            #cv2.waitKey(0)
-            #            
-            ii = ii+1
-            print(ii)
+            #cv2.waitKey(1)
             prev_frame = cur_frame
     viewer.stop()
-
-
-    df = pd.DataFrame(data=trajectory)
-    df.to_csv('trajectory.csv')
-
-    #plt.plot(trajectory[:,0],trajectory[:,1] , '*')
-    #plt.show()
+    
+    

@@ -18,17 +18,68 @@ def MatchAndNormalize(kp1, kp2, matches, K):
     pts_r_norm = cv2.undistortPoints(np.expand_dims(pts2, axis=1), cameraMatrix=K, distCoeffs=None)
     return pts_l_norm, pts_r_norm
 
+# used in transformation score calculation
+def matlab_max(v, s):
+        return [max(v[i],s) for i in range(len(v))]
+
 # Expects pts1 and pts2 to be matched and normalized with intrinsics
 def estimateEssential(pts1, pts2, essTh):
     #E, inliers = cv2.findEssentialMat(pts1, pts2, focal=1.0, pp=(0., 0.), method=cv2.RANSAC, prob=0.999, threshold=3.0/essTh) # threshold=3.0 / essTh
     E, inliers = cv2.findEssentialMat(pts1, pts2, method=cv2.LMEDS) # threshold=3.0 / essTh
-    return E, inliers
+    # https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
+    inlierPoints1 = pts1[inliers==1]
+    inlierPoints2 = pts2[inliers==1]
+    
+    
+    lineIn1 = cv2.computeCorrespondEpilines(inlierPoints2.reshape(-1,1,2), 2,E) # original with F
+    lineIn1 = lineIn1.reshape(-1,3)
+    
+
+    inliersIndex  = np.where(inliers==1)
+
+    locations1 = (np.concatenate(    (inlierPoints1, np.ones((np.shape(inlierPoints1)[0], 1)))    , axis=1))
+    locations2 = (np.concatenate(    (inlierPoints2, np.ones((np.shape(inlierPoints2)[0], 1)))   , axis=1))
+    
+    error2in1 = (np.sum(locations1 * lineIn1, axis = 1))**2 / np.sum(lineIn1[:,:3]**2, axis=1)
+    
+    lineIn2 = cv2.computeCorrespondEpilines(inlierPoints1.reshape(-1,1,2), 2,E) # original with F
+    lineIn2 = lineIn2.reshape(-1,3)
+    
+    error1in2 = (np.sum(locations2 * lineIn2, axis = 1))**2 / np.sum(lineIn2[:,:3]**2, axis=1)
+    
+    
+    outlierThreshold = 4
+
+    
+
+    score = np.sum(matlab_max(outlierThreshold-error1in2, 0)) + sum(matlab_max(outlierThreshold-error2in1, 0))
+
+
+
+    return E, inliers, score
         
 # Expects pts1 and pts2 to be matched and normalized with intrinsics
 def estimateHomography(pts1, pts2, homTh):
     #H, inliers = cv2.findHomography(pts1, pts2, cv2.RANSAC, ransacReprojThreshold=3.0/homTh)
     H, inliers = cv2.findHomography(pts1, pts2, cv2.LMEDS)
-    return H, inliers
+
+    inlierPoints1 = pts1[inliers==1]
+    inlierPoints2 = pts2[inliers==1]
+
+    inliersIndex  = np.where(inliers==1)
+
+    locations1 = (np.concatenate(    (inlierPoints1, np.ones((np.shape(inlierPoints1)[0], 1)))    , axis=1))
+    locations2 = (np.concatenate(    (inlierPoints2, np.ones((np.shape(inlierPoints2)[0], 1)))   , axis=1))
+    xy1In2     = (H @ locations1.T).T
+    xy2In1     = (np.linalg.inv(H) @ locations2.T).T
+    error1in2  = np.sum((locations2 - xy1In2)**2, axis=1)
+    error2in1  = np.sum((locations1 - xy2In1)**2, axis=1)
+
+    outlierThreshold = 6
+
+    score = np.sum(matlab_max(outlierThreshold-error1in2, 0)) + np.sum(matlab_max(outlierThreshold-error2in1, 0))
+
+    return H, inliers, score
 
 def triangulateMidPoint(points1, points2, P1, P2):
     points1 = np.squeeze(points1)
@@ -41,7 +92,6 @@ def triangulateMidPoint(points1, points2, P1, P2):
     M2 = P2[:3, :3]
     # Get least-squares solution
     c1 = np.linalg.lstsq(-M1,  P1[:,3], rcond=None)[0]
-    #print(np.shape(M1))
     c2 = np.linalg.lstsq(-M2, P2[:,3], rcond=None)[0]
     y = c2 - c1
     u1 = np.concatenate((points1, np.ones((numPoints,1))), axis=1)
@@ -106,20 +156,22 @@ def chooseRealizableSolution(Rs, Ts, K, points1, points2):
     return R, t, validFraction
 
 
-def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Homography"):
+def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essential"):
     if tform_type == "Homography":
         # decompose homography into 4 possible solutions
         num, Rs, Ts, Ns  = cv2.decomposeHomographyMat(tform, K)
         # choose realizable solutions according to cheirality check
         R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
-        return R[0], t[0], validFraction
+        if np.shape(R)[0] >= 2:
+            return R[1], t[1], validFraction
+        else:
+            return R, t, validFraction
         
     elif tform_type == "Essential":
         # recoverpose way:
-        print(np.shape(inlier_pts1))
-        points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
-        print(R)
-        validFraction = np.sum(inliers) / len(inliers) 
+        #points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
+        #validFraction = np.sum(inliers) / len(inliers)
+        #return R, t, validFraction 
         # decompose essential matrix into 4 possible solutions
         #R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
@@ -127,11 +179,14 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Homog
         #Rs = np.concatenate((R1, R1, R2, R2), axis=0)
         #Ts = np.concatenate((t,-t,t,-t))
         # choose realizable solutions according to cheirality check
-        #R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
-        return R[0], t[0], validFraction
+        R, t, validFraction = chooseRealizableSolution(Rs, Ts, K, inlier_pts1, inlier_pts2)
+        if np.shape(R)[0] >= 2:
+            return R[1], t[1], validFraction
+        else:
+            return R, t, validFraction
     else:
         print("Unknown tform_type")
-        return None, None
+        return None, None, 0
     
 def triangulation(kp1, kp2, T_1w, T_2w):
     """Triangulation to get 3D points
