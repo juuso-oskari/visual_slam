@@ -127,7 +127,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     
-    for i in range(2,500):
+    for i in range(2,1000):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -140,47 +140,48 @@ if __name__=="__main__":
             if(len(matches) < 100):
                 print("too few matches")
                 continue
-            # match and normalize keypoints
-            preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
-            # compute homography and inliers
-            H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh= K[0,0]) # ransac threshold as last argument
-            print("Homography score: ")
-            print(scoreH)
-            # compute essential and inliers
-            E, inliersE , scoreE = estimateEssential(preMatchedPoints, curMatchedPoints, essTh=K[0,0])
-            print("Essential score: ")
-            print(scoreE)
-            # choose between models based on number of inliers
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
-            tform = H
-            inliers = inliersH
-            tform_type = "Homography"
-            if sum(inliersH) < sum(inliersE):
-                #print("Chose Essential")
-                tform = E
-                inliers = inliersE
-                tform_type = "Essential"
+            # match and normalize keypoints
+            #preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
+            preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.keypoints, cur_frame.keypoints, matches)
+            # compute homography and inliers
+            H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh=4.0) # ransac threshold as last argument
+            # compute essential and inliers
+            E, inliersE , scoreE = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
+            if debug:
+                print("Homography score: ")
+                print(scoreH)
+                print("Essential score: ")
+                print(scoreE)
+                print("T with Homography: ")
+                R,t, validFraction = estimateRelativePose(H, preMatchedPoints[inliersH[:, 0] == 1, :], curMatchedPoints[inliersH[:, 0] == 1, :], K, "Homography")
+                print(t)
+                print("T with Essential: ")
+                R,t, validFraction = estimateRelativePose(E, preMatchedPoints[inliersE[:, 0] == 1, :], curMatchedPoints[inliersE[:, 0] == 1, :], K, "Essential")
+                print(t)
+                print("T with recoverPose(Essential): ")
+                points, R, t, inliers = cv2.recoverPose(E, preMatchedPoints[inliersE[:, 0] == 1, :], curMatchedPoints[inliersE[:, 0] == 1, :], cameraMatrix=K)
+                print(t)
+            
+            # Select the model based on a heuristic
+            ratio = scoreH/(scoreH + scoreE)
+            ratioThreshold = 0.45
+            if ratio > ratioThreshold:
+                inliers = inliersH
+                tform = H
+                tform_type = "Homography"
+                print("Chose homography")
             else:
-                print("chose Homography")
-            # if number of inliers with the better model too low continue to next frame
-            if sum(inliers) < 100:
-                print("too few inliers")
-                continue
-                
+                inliers = inliersE
+                tform = E
+                tform_type = "Essential"
+                print("Chose essential")
+             
             # else continue with the inliers
             inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
             R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
-            #print(np.shape(R))
-            #print(np.shape(t))
-            #print("estRel")
-            #print(R)
-            #print(t)
-            #points, R, t, inliers = cv2.recoverPose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], cameraMatrix=K)
-            #print("recoverpose")
-            #print(R)
-            #print(t)
             # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
             #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
