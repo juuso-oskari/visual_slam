@@ -16,7 +16,7 @@ def MatchAndNormalize(kp1, kp2, matches, K):
     # normalize points
     pts_l_norm = cv2.undistortPoints(np.expand_dims(pts1, axis=1), cameraMatrix=K, distCoeffs=None)
     pts_r_norm = cv2.undistortPoints(np.expand_dims(pts2, axis=1), cameraMatrix=K, distCoeffs=None)
-    return pts_l_norm, pts_r_norm
+    return np.squeeze(pts_l_norm), np.squeeze(pts_r_norm)
 
 def MatchPoints(kp1, kp2, matches):
     # match keypoints
@@ -42,11 +42,11 @@ def estimateEssential(pts1, pts2, K, essTh):
     #E, inliers = cv2.findEssentialMat(pts1, pts2, focal=1.0, pp=(0., 0.), method=cv2.RANSAC, prob=0.999, threshold=3.0/essTh) # threshold=3.0 / essTh
     pts1 = cv2.undistortPoints(np.expand_dims(pts1, axis=1), cameraMatrix=K, distCoeffs=None)
     pts2 = cv2.undistortPoints(np.expand_dims(pts2, axis=1), cameraMatrix=K, distCoeffs=None)
-    
+    pts1, pts2 = np.squeeze(pts1), np.squeeze(pts2)
     E, inliers = cv2.findEssentialMat(pts1, pts2,  method=cv2.RANSAC, prob=0.999, threshold=essTh) # threshold=3.0 / essTh
     # https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
-    inlierPoints1 = pts1[inliers==1]
-    inlierPoints2 = pts2[inliers==1]
+    inlierPoints1 = pts1[inliers[:, 0] == 1, :]
+    inlierPoints2 = pts2[inliers[:, 0] == 1, :]
     
     
     lineIn1 = cv2.computeCorrespondEpilines(inlierPoints2.reshape(-1,1,2), 2,E) # original with F
@@ -67,8 +67,6 @@ def estimateEssential(pts1, pts2, K, essTh):
     
     
     outlierThreshold = 4
-
-    
 
     score = np.sum(matlab_max(outlierThreshold-error1in2, 0)) + sum(matlab_max(outlierThreshold-error2in1, 0))
 
@@ -186,7 +184,7 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
     elif tform_type == "Essential":
         # recoverpose way:
         points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
-        validFraction = np.sum(inliers) / len(inliers)
+        validFraction = points / np.shape(inliers)[0]
         return R, t, validFraction 
         # decompose essential matrix into 4 possible solutions
         R1, R2, t = cv2.decomposeEssentialMat(tform)

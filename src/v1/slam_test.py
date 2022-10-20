@@ -101,7 +101,7 @@ class Isometry3d(object):
 
 if __name__=="__main__":
     # Global variables
-    debug = True
+    debug = False
     scale = 5000
     D = np.array([0, 0, 0, 0], dtype=np.float32)  # no distortion
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
@@ -139,14 +139,14 @@ if __name__=="__main__":
             # if not enough matches (<100) continue to next frame
             if(len(matches) < 100):
                 print("too few matches")
-                continue
+                pass # continue
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
             # match and normalize keypoints
             #preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
             preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.keypoints, cur_frame.keypoints, matches)
             # compute homography and inliers
             H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh=4.0) # ransac threshold as last argument
-            # compute essential and inliers
+            ## compute essential and inliers
             E, inliersE , scoreE = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
             if debug:
                 print("Homography score: ")
@@ -163,7 +163,7 @@ if __name__=="__main__":
                 points, R, t, inliers = cv2.recoverPose(E, preMatchedPoints[inliersE[:, 0] == 1, :], curMatchedPoints[inliersE[:, 0] == 1, :], cameraMatrix=K)
                 print(t)
             
-            # Select the model based on a heuristic
+            # TODO: Select the model based on a heuristic
             ratio = scoreH/(scoreH + scoreE)
             ratioThreshold = 0.45
             if ratio > ratioThreshold:
@@ -176,12 +176,18 @@ if __name__=="__main__":
                 tform = E
                 tform_type = "Essential"
                 print("Chose essential")
-             
+            # currently selects essential everytime    
+            #inliers = inliersE
+            #tform = E
+            #tform_type = "Essential" 
+        
             # else continue with the inliers
             inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
             R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
+            if(validFraction < 0.9):
+                pass #continue
             # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
             #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
@@ -190,17 +196,6 @@ if __name__=="__main__":
             poses.append(pose)
             new_xyz = trajectory[-1] + pose[:3,3]
             trajectory.append(new_xyz)
-            """
-            print("Rotation: ")
-            print(R)
-            print("Translation: ")
-            print(t)
-            
-            print("valid fraction: ")
-            print(validFraction)
-            print("number of solutions: ")
-            print(len(r))
-            """
             # TODO: triangulate two view to obtain 3-D map points
             
             
