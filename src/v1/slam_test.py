@@ -11,6 +11,7 @@ import re
 from viewer import Viewer
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
+np.set_printoptions(suppress=True)
 #import pandas as pd
 
 
@@ -107,7 +108,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -127,7 +128,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     
-    for i in range(2,1000):
+    for i in range(2,30):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -192,13 +193,21 @@ if __name__=="__main__":
             #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
             pose = RelativePoseTransformation @ poses[-1]
-            viewer.update_pose(pose = g2o.Isometry3d(pose))
             poses.append(pose)
             new_xyz = trajectory[-1] + pose[:3,3]
             trajectory.append(new_xyz)
             # TODO: triangulate two view to obtain 3-D map points
+
+            X, X1, X2 = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1])
+            print(X.T)
             
-            
+
+            X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
+            print(np.shape(X_homogenious))
+            print((poses[-1][0:3,0:4]@ X_homogenious).T)
+
+            viewer.update_pose(pose = g2o.Isometry3d(pose))
+
             # Display
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
