@@ -3,3 +3,4 @@ data/rgbd_dataset_freiburg2_xyz
 .venv_old
 data/
 src/testing.ipynb
+__pycache__
