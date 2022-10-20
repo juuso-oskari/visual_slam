@@ -217,7 +217,7 @@ def triangulation(kp1, kp2, T_1w, T_2w):
         X1 (3xN): 3D coordinates of the keypoints w.r.t view1 coordinate
         X2 (3xN): 3D coordinates of the keypoints w.r.t view2 coordinate
     """
-    print(np.shape(kp1))
+    #print(np.shape(kp1))
     kp1_3D = np.ones((3, kp1.shape[0]))
     kp2_3D = np.ones((3, kp2.shape[0]))
     kp1_3D[0], kp1_3D[1] = kp1[:, 0].copy(), kp1[:, 1].copy()

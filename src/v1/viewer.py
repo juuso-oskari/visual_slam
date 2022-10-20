@@ -10,16 +10,16 @@ class Viewer(object):
     def __init__(self):
         self.pose_queue = Queue()
         self.colour_queue = Queue()
-
         self.q_points = Queue()
-
         self.view_thread = Process(target=self.view)
         self.view_thread.start()
+
 
     def update_pose(self, pose, cloud=None, colour = None):
         if pose is None:
             return
         self.pose_queue.put(pose.matrix())
+
 
 
     def view(self):
@@ -80,8 +80,7 @@ class Viewer(object):
                 trajectory.append(poses[:3, 3])
                 camera = poses
                 pose.m = poses
-
-
+            
             if camera is not  None:
                 follow = m_follow_camera.Get()
                 if follow and following:
@@ -109,6 +108,7 @@ class Viewer(object):
                 gl.glPointSize(8)
                 gl.glColor3f(0.0, 1.0, 0.0)
                 pangolin.DrawLine(trajectory.array())
+
 
 
             pangolin.FinishFrame()
