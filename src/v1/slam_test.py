@@ -201,7 +201,8 @@ if __name__=="__main__":
             print(len(r))
             """
             # TODO: triangulate two view to obtain 3-D map points
-            
+            X, X1, X2 = triangulation(np.squeeze(inlierPrePoints, dim=1), np.squeeze(inlierCurrPoints, dim = 1), np.eye(4), pose)
+            print(X)
             
             # Display
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
