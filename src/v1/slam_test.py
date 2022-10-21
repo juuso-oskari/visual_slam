@@ -108,7 +108,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -128,7 +128,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     
-    for i in range(2,30):
+    for i in range(2,500):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -198,13 +198,13 @@ if __name__=="__main__":
             trajectory.append(new_xyz)
             # TODO: triangulate two view to obtain 3-D map points
 
-            X, X1, X2 = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1])
-            print(X.T)
+            X, X1, X2 = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1],K)
+            #print(X.T)
             
 
             X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
-            print(np.shape(X_homogenious))
-            print((poses[-1][0:3,0:4]@ X_homogenious).T)
+            #print(np.shape(X_homogenious))
+            #print((poses[-1][0:3,0:4]@ X_homogenious).T)
 
             viewer.update_pose(pose = g2o.Isometry3d(pose))
 

@@ -201,7 +201,7 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         print("Unknown tform_type")
         return None, None, 0
     
-def triangulation(kp1, kp2, T_1w, T_2w):
+def triangulation(kp1, kp2, T_1w, T_2w, K):
     """Triangulation to get 3D points
     Initial version of trigualation
     Might be error prone
@@ -215,7 +215,6 @@ def triangulation(kp1, kp2, T_1w, T_2w):
         X1 (3xN): 3D coordinates of the keypoints w.r.t view1 coordinate
         X2 (3xN): 3D coordinates of the keypoints w.r.t view2 coordinate
     """
-    #print(np.shape(kp1))
     kp1_3D = np.ones((3, kp1.shape[0]))
     kp2_3D = np.ones((3, kp2.shape[0]))
     kp1_3D[0], kp1_3D[1] = kp1[:, 0].copy(), kp1[:, 1].copy()
@@ -224,4 +223,34 @@ def triangulation(kp1, kp2, T_1w, T_2w):
     X /= X[3]
     X1 = T_1w[:3] @ X
     X2 = T_2w[:3] @ X
+    # get reprojection error
+    # project world points (in camera 2 reference frame) back to image plane (image plane of camera 2)
+    print(K)
+    proj_points2 = K @ X2
+    print(np.shape(proj_points2))
+    print(proj_points2[:,0])
+    print(kp2[0])
+    err2 = kp2 - proj_points2
+    # do the same for first image
+    proj_points1 = K @ X1
+    err1 = kp1 - proj_points1[:2]
+    reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=0)
+    print(np.shape(reprojection_error))
+    print(reprojection_error)
+    # get visible inliers
+    visible = []
+    i = 0
+    for z1, z2 in zip(X1, X2):
+        # z = cam.cam_map(pose * point)
+        if (0 <= z1[0] < 640 and 0 <= z1[1] < 480 and z1[2] > 0) and (0 <= z2[0] < 640 and 0 <= z2[1] < 480 and z2[2] > 0):
+            visible.append((i, z1, z2))
+        i = i + 1
+    
+    
+    
+    # get parallax
+    
+    
+    
+    
     return X[:3], X1, X2
