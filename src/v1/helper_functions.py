@@ -241,5 +241,5 @@ def triangulation(kp1, kp2, T_1w, T_2w, reprojection_threshold = 1, min_parallax
     
     # get inliers
     inliers = reprojection_error < reprojection_threshold and cosangle > np.arccos(min_parallax)
-    
+    print("jee")
     return X[:3], X1, X2, inliers
