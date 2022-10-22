@@ -228,15 +228,21 @@ def triangulation(kp1, kp2, T_1w, T_2w, reprojection_threshold = 1, min_parallax
     # Our poses (estimated from essential matrix) already account for camera intrinsics (K)
     proj_points2 = X2
     proj_points2 /= proj_points2[2] # normalize to homogenous coordinates
+    #print("org")
+    #print(kp2[0])
+    #print("proj")
+    #print(proj_points2[:,0])
+
     err2 = np.abs(kp2 - proj_points2[:2].T)
+    #print(err2)
     # do the same for first image
     proj_points1 = X1
     proj_points1 /= proj_points1[2]
     err1 = np.abs(kp1 - proj_points1[:2].T)
     reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=1)
     # a good two-view with significant parallax
-    ray1 = X - T_1w.t
-    ray2 = X - T_2w.t
+    ray1 = X - np.expand_dims(T_1w[:, 3], axis=1)
+    ray2 = X - T_2w[:, 3]
     cosangle = np.sum(ray1 * ray2, axis=0) / (   np.linalg.norm(ray1, axis=0)*np.linalg.norm(ray2, axis=0)  )    
     
     # get inliers
