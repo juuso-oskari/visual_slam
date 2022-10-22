@@ -143,6 +143,7 @@ if __name__=="__main__":
                 pass # continue
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
             # match and normalize keypoints
+            # CAUTION: normalizing or not normalizing change the results so be careful
             #preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
             preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.keypoints, cur_frame.keypoints, matches)
             # compute homography and inliers

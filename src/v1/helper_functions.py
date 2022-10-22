@@ -201,7 +201,7 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         print("Unknown tform_type")
         return None, None, 0
     
-def triangulation(kp1, kp2, T_1w, T_2w, K):
+def triangulation(kp1, kp2, T_1w, T_2w, reprojection_threshold = 1, min_parallax = 4):
     """Triangulation to get 3D points
     Initial version of trigualation
     Might be error prone
@@ -225,32 +225,21 @@ def triangulation(kp1, kp2, T_1w, T_2w, K):
     X2 = T_2w[:3] @ X
     # get reprojection error
     # project world points (in camera 2 reference frame) back to image plane (image plane of camera 2)
-    print(K)
-    proj_points2 = K @ X2
-    print(np.shape(proj_points2))
-    print(proj_points2[:,0])
-    print(kp2[0])
-    err2 = kp2 - proj_points2
+    # Our poses (estimated from essential matrix) already account for camera intrinsics (K)
+    proj_points2 = X2
+    proj_points2 /= proj_points2[2] # normalize to homogenous coordinates
+    err2 = np.abs(kp2 - proj_points2[:2].T)
     # do the same for first image
-    proj_points1 = K @ X1
-    err1 = kp1 - proj_points1[:2]
-    reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=0)
-    print(np.shape(reprojection_error))
-    print(reprojection_error)
-    # get visible inliers
-    visible = []
-    i = 0
-    for z1, z2 in zip(X1, X2):
-        # z = cam.cam_map(pose * point)
-        if (0 <= z1[0] < 640 and 0 <= z1[1] < 480 and z1[2] > 0) and (0 <= z2[0] < 640 and 0 <= z2[1] < 480 and z2[2] > 0):
-            visible.append((i, z1, z2))
-        i = i + 1
+    proj_points1 = X1
+    proj_points1 /= proj_points1[2]
+    err1 = np.abs(kp1 - proj_points1[:2].T)
+    reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=1)
+    # a good two-view with significant parallax
+    ray1 = X - T_1w.t
+    ray2 = X - T_2w.t
+    cosangle = np.sum(ray1 * ray2, axis=0) / (   np.linalg.norm(ray1, axis=0)*np.linalg.norm(ray2, axis=0)  )    
     
+    # get inliers
+    inliers = reprojection_error < reprojection_threshold and cosangle > np.arccos(min_parallax)
     
-    
-    # get parallax
-    
-    
-    
-    
-    return X[:3], X1, X2
+    return X[:3], X1, X2, inliers
