@@ -201,7 +201,7 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         print("Unknown tform_type")
         return None, None, 0
     
-def triangulation(kp1, kp2, T_1w, T_2w, reprojection_threshold = 1, min_parallax = 4):
+def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_threshold = 1, min_parallax = 4):
     """Triangulation to get 3D points
     Initial version of trigualation
     Might be error prone
@@ -215,31 +215,46 @@ def triangulation(kp1, kp2, T_1w, T_2w, reprojection_threshold = 1, min_parallax
         X1 (3xN): 3D coordinates of the keypoints w.r.t view1 coordinate
         X2 (3xN): 3D coordinates of the keypoints w.r.t view2 coordinate
     """
+    kp1 = np.squeeze(cv2.undistortPoints(kp1_non_norm, cameraMatrix=K, distCoeffs=None))
+    kp2 = np.squeeze(cv2.undistortPoints(kp2_non_norm, cameraMatrix=K, distCoeffs=None))
     kp1_3D = np.ones((3, kp1.shape[0]))
     kp2_3D = np.ones((3, kp2.shape[0]))
     kp1_3D[0], kp1_3D[1] = kp1[:, 0].copy(), kp1[:, 1].copy()
     kp2_3D[0], kp2_3D[1] = kp2[:, 0].copy(), kp2[:, 1].copy()
     X = cv2.triangulatePoints(T_1w[:3], T_2w[:3], kp1_3D[:2], kp2_3D[:2])
+    #print(X)
     X /= X[3]
     X1 = T_1w[:3] @ X
     X2 = T_2w[:3] @ X
     # get reprojection error
     # project world points (in camera 2 reference frame) back to image plane (image plane of camera 2)
     # Our poses (estimated from essential matrix) already account for camera intrinsics (K)
-    proj_points2 = X2
+    proj_points2 = X2.copy()
     proj_points2 /= proj_points2[2] # normalize to homogenous coordinates
+    print("org")
+    print(kp2[0])
+    print("proj")
+    print(proj_points2[:,0])
+
     err2 = np.abs(kp2 - proj_points2[:2].T)
+    #print(err2)
     # do the same for first image
-    proj_points1 = X1
+    proj_points1 = X1.copy()
     proj_points1 /= proj_points1[2]
     err1 = np.abs(kp1 - proj_points1[:2].T)
     reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=1)
     # a good two-view with significant parallax
-    ray1 = X - T_1w.t
-    ray2 = X - T_2w.t
+    ray1 = X - np.expand_dims(T_1w[:, 3], axis=1)
+    ray2 = X - np.expand_dims(T_2w[:, 3], axis=1)
     cosangle = np.sum(ray1 * ray2, axis=0) / (   np.linalg.norm(ray1, axis=0)*np.linalg.norm(ray2, axis=0)  )    
     
     # get inliers
-    inliers = reprojection_error < reprojection_threshold and cosangle > np.arccos(min_parallax)
-    
+    #print("cosangle")
+    #print(np.shape(cosangle))
+    #print("reprojection error")
+    #print(np.shape(reprojection_error))
+    #print(reprojection_error < reprojection_threshold)
+    #inliers = all(reprojection_error < reprojection_threshold and cosangle > np.arccos(min_parallax))
+    #print("jee")
+    inliers = 0
     return X[:3], X1, X2, inliers

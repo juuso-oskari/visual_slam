@@ -108,7 +108,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -120,6 +120,8 @@ if __name__=="__main__":
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
     trajectory = [np.array([0, 0, 0])] # camera trajectory for visualization
+    #trajectory2 = np.array([0, 0, 0]) # camera trajectory for visualization
+
     poses = [np.eye(4)]
     # run feature extraction for 1st image
     fp_rgb = dir_rgb + str(1) + ".png"
@@ -127,8 +129,8 @@ if __name__=="__main__":
     cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
-    
-    for i in range(2,500):
+    map = []
+    for i in range(2,200):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -194,19 +196,34 @@ if __name__=="__main__":
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
             pose = RelativePoseTransformation @ poses[-1]
             poses.append(pose)
-            new_xyz = pose[:3,3]
-            trajectory.append(new_xyz)
-            # TODO: triangulate two view to obtain 3-D map points
 
-            X, X1, X2 = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1],K)
+
+            # TODO: triangulate two view to obtain 3-D map points
+            #print(poses[-2])
+            #print(poses[-1])
+            X, X1, X2, inliers = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1], K)
+            #X, X1, X2, inliers = triangulation(preMatchedPoints,curMatchedPoints, poses[-2], poses[-1])
+            print(np.shape(K))
+            print(X.T)
             #print(X.T)
             
 
             X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
-            #print(np.shape(X_homogenious))
-            #print((poses[-1][0:3,0:4]@ X_homogenious).T)
+            #print("test")
+            #print((pose.T@X_homogenious).T)
 
-            viewer.update_pose(pose = g2o.Isometry3d(pose))
+            pts_obj = (pose.T@X_homogenious)
+            pts_obj/= pts_obj[3]
+            map.append((np.linalg.inv(K)@X).T)
+
+            #print(pts_obj.T)
+            #print(X_homogenious.T)
+            #print((pts_obj[0:3,:]).T)
+            #print((poses[-1][0:3,0:4]@ X_homogenious).T)
+            #self.pts_obj @ self.pose.T
+            #print(pose)
+            #print(np.shape(pose.T @ X_homogenious))
+            viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (np.linalg.inv(K)@X).T, colour=np.array([[0],[0],[0]]).T)
 
             # Display
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -216,4 +233,22 @@ if __name__=="__main__":
             prev_frame = cur_frame
     viewer.stop()
     
+
+
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    #print(map)
+    # Data for a three-dimensional line
+    for p,m in zip(poses,map):
+        if (np.min(m[:,0]) <-1000 or np.max(m[:,0]) >1000):
+            continue
+        if (np.min(m[:,2]) <-1000 or np.max(m[:,2]) >1000):
+            continue
+        if (np.min(m[:,1]) <-1000 or np.max(m[:,1]) >1000):
+            continue
+            #print(p[0,3])
+        ax.scatter(m[:,0],m[:,1],m[:,2],c='blue',marker="o")
+        ax.scatter(p[0,3], p[1,3], p[2,3], c='red', marker="p")
+    plt.show()
+
     
