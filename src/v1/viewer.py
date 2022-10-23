@@ -8,19 +8,31 @@ from multiprocessing import Queue, Process
 
 class Viewer(object):
     def __init__(self):
+        self.image_queue = Queue()
         self.pose_queue = Queue()
+        self.map_queue = Queue()
         self.colour_queue = Queue()
+
         self.q_points = Queue()
+
         self.view_thread = Process(target=self.view)
         self.view_thread.start()
-
 
     def update_pose(self, pose, cloud=None, colour = None):
         if pose is None:
             return
         self.pose_queue.put(pose.matrix())
+        if cloud is not None:
+            self.map_queue.put((cloud.tolist(), 1))
+        if colour is not None:
+            self.colour_queue.put(colour.tolist())
 
-
+    def update_image(self, image):
+        if image is None:
+            return
+        elif image.ndim == 2:
+            image = np.repeat(image[..., np.newaxis], 3, axis=2)
+        self.image_queue.put(image)
 
     def view(self):
         pangolin.CreateWindowAndBind('RGB-D SLAM', 1024, 768)
@@ -80,7 +92,22 @@ class Viewer(object):
                 trajectory.append(poses[:3, 3])
                 camera = poses
                 pose.m = poses
-            
+
+            if not self.image_queue.empty():
+                while not self.image_queue.empty():
+                    img = self.image_queue.get()
+                img = img[::-1, :, ::-1]
+                img = cv2.resize(img, (width, height))
+                image = img.copy()
+
+            # Show mappoints
+            if not self.map_queue.empty():
+                pts, code = self.map_queue.get()
+                if code == 1:  # append new points extend mappoints->314, pts->(229, 3), type=<class 'list'>
+                    mappoints.extend(pts)
+            if not self.colour_queue.empty():
+                pts_color.extend(self.colour_queue.get())
+
             if camera is not  None:
                 follow = m_follow_camera.Get()
                 if follow and following:
@@ -107,9 +134,20 @@ class Viewer(object):
             if len(trajectory) > 0:
                 gl.glPointSize(8)
                 gl.glColor3f(0.0, 1.0, 0.0)
-                pangolin.DrawLine(trajectory.array())
+                pangolin.DrawPoints(trajectory.array())
 
+            # show map
+            if len(mappoints) > 0 and len(pts_color)>0:
+                gl.glPointSize(5)
+                gl.glColor3f(1.0, 0.0, 0.0)
+                pangolin.DrawPoints(mappoints.array(), pts_color.array())
 
+            # show image
+            if image is not None:
+                texture.Upload(image, gl.GL_RGB, gl.GL_UNSIGNED_BYTE)
+                dimg.Activate()
+                gl.glColor3f(1.0, 1.0, 1.0)
+                texture.RenderToViewport()
 
             pangolin.FinishFrame()
 
