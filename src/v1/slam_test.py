@@ -182,7 +182,6 @@ if __name__=="__main__":
             #inliers = inliersE
             #tform = E
             #tform_type = "Essential" 
-        
             # else continue with the inliers
             inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
@@ -195,7 +194,7 @@ if __name__=="__main__":
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
             pose = RelativePoseTransformation @ poses[-1]
             poses.append(pose)
-            new_xyz = trajectory[-1] + pose[:3,3]
+            new_xyz = pose[:3,3]
             trajectory.append(new_xyz)
             # TODO: triangulate two view to obtain 3-D map points
 
