@@ -130,7 +130,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     map = []
-    for i in range(2,500):
+    for i in range(2,200):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -201,10 +201,10 @@ if __name__=="__main__":
             # TODO: triangulate two view to obtain 3-D map points
             #print(poses[-2])
             #print(poses[-1])
-            #X, X1, X2, inliers = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1])
-            X, X1, X2, inliers = triangulation(preMatchedPoints,curMatchedPoints, poses[-2], poses[-1])
+            X, X1, X2, inliers = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1], K)
+            #X, X1, X2, inliers = triangulation(preMatchedPoints,curMatchedPoints, poses[-2], poses[-1])
             print(np.shape(K))
-            print(np.shape(X))
+            print(X.T)
             #print(X.T)
             
 
@@ -214,7 +214,7 @@ if __name__=="__main__":
 
             pts_obj = (pose.T@X_homogenious)
             pts_obj/= pts_obj[3]
-            map.append(X.T)
+            map.append((np.linalg.inv(K)@X).T)
 
             #print(pts_obj.T)
             #print(X_homogenious.T)
@@ -223,7 +223,7 @@ if __name__=="__main__":
             #self.pts_obj @ self.pose.T
             #print(pose)
             #print(np.shape(pose.T @ X_homogenious))
-            viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (X).T, colour=np.array([[0],[0],[0]]).T)
+            viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (np.linalg.inv(K)@X).T, colour=np.array([[0],[0],[0]]).T)
 
             # Display
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
