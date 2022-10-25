@@ -37,38 +37,21 @@ class FeatureExtractor:
 class FeatureMatcher():
     def __init__(self):
         self.matcher = cv2.BFMatcher()
-    def match_features(self, frame_cur, frame_prev):
-        kp1, desc1 = frame_cur.keypoints, frame_cur.features
-        kp2, desc2 = frame_prev.keypoints, frame_prev.features
+    def match_features(self, frame_prev, frame_cur, ratio = 0.8):
+        kp1, desc1 = frame_prev.keypoints, frame_prev.features
+        kp2, desc2 = frame_cur.keypoints, frame_cur.features
         # Match descriptors.
-        matches = self.matcher.knnMatch(desc1,desc2,k=1)
-        # Sort the matches according to nearest neighbor distance ratio (NNDR) (CV course, exercise 4)
-        distmat = np.dot(desc1, desc2.T)
-        X_terms = np.expand_dims(np.diag(np.dot(desc1, desc1.T)), axis=1)
-        X_terms = np.tile(X_terms,(1,desc2.shape[0]))
-        Y_terms = np.expand_dims(np.diag(np.dot(desc2, desc2.T)), axis=0)
-        Y_terms = np.tile(Y_terms,(desc1.shape[0],1))
-        distmat = np.sqrt(Y_terms + X_terms - 2*distmat)
-        ## We determine the mutually nearest neighbors
-        dist1 = np.amin(distmat, axis=1)
-        ids1 = np.argmin(distmat, axis=1)
-        dist2 = np.amin(distmat, axis=0)
-        ids2 = np.argmin(distmat, axis=0)
-        pairs = []
-        for k in range(ids1.size):
-            if k == ids2[ids1[k]]:
-                pairs.append(np.array([k, ids1[k], dist1[k]]))
-        pairs = np.array(pairs)
-        # We sort the mutually nearest neighbors based on the nearest neighbor distance ratio
-        NNDR = []
-        for k,ids1_k,dist1_k in pairs:
-            r_k = np.sort(distmat[int(k),:])
-            nndr = r_k[0]/r_k[1]
-            NNDR.append(nndr)
-
-        id_nnd = np.argsort(NNDR)
-        return np.array(matches)[id_nnd]
-
+        rawMatches = self.matcher.knnMatch(desc1,desc2,k=2)
+        # perform Lowe's ratio test to get actual matches
+        matches = []
+        for m, n in rawMatches:
+            # ensure the distance is within a certain ratio of each
+            # other (i.e. Lowe's ratio test)
+            if m.distance < ratio * n.distance:
+                # here queryIdx corresponds to kpsA
+                # trainIdx corresponds to kpsB
+                matches.append([m])
+        return matches
 
 class Frame:
     def __init__(self, rgb_fp, d_path, feature_extractor):
@@ -108,7 +91,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     is_WINDOWS = False
@@ -121,8 +104,7 @@ if __name__=="__main__":
     feature_matcher = FeatureMatcher()
     trajectory = [np.array([0, 0, 0])] # camera trajectory for visualization
     #trajectory2 = np.array([0, 0, 0]) # camera trajectory for visualization
-
-    poses = [np.eye(4)]
+    poses = [np.eye(4)] # inverses of point transforms, opencv by default gives point transforms between images as to where the points move instead of camera moving
     # run feature extraction for 1st image
     fp_rgb = dir_rgb + str(1) + ".png"
     fp_depth = dir_depth + str(1) + ".png"
@@ -130,7 +112,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     map = []
-    for i in range(2,200):
+    for i in range(2,1200):
         if i % 20 == 0:
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
@@ -148,8 +130,11 @@ if __name__=="__main__":
             # CAUTION: normalizing or not normalizing change the results so be careful
             #preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
             preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.keypoints, cur_frame.keypoints, matches)
+            print(np.shape(preMatchedPoints))
+            print(preMatchedPoints[:10])
             # compute homography and inliers
-            H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh=4.0) # ransac threshold as last argument
+            #H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh=4.0) # ransac threshold as last argument
+            scoreH = 0
             ## compute essential and inliers
             E, inliersE , scoreE = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
             if debug:
@@ -188,48 +173,37 @@ if __name__=="__main__":
             inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
-            R,t, validFraction = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
+            R, t, validFraction, triangulatedPoints = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
+            
             if(validFraction < 0.9):
                 pass #continue
             # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
             #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
+            PointTransformation = Isometry3d(R=R, t=np.squeeze(t)).matrix()
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
+            #print(RelativePoseTransformation.T@RelativePoseTransformation)
             pose = RelativePoseTransformation @ poses[-1]
             poses.append(pose)
-
-
-            # TODO: triangulate two view to obtain 3-D map points
-            #print(poses[-2])
-            #print(poses[-1])
-            X, X1, X2, inliers = triangulation(inlierPrePoints,inlierCurrPoints, poses[-2], poses[-1], K)
-            #X, X1, X2, inliers = triangulation(preMatchedPoints,curMatchedPoints, poses[-2], poses[-1])
-            print(np.shape(K))
-            print(X.T)
-            #print(X.T)
             
-
-            X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
-            #print("test")
-            #print((pose.T@X_homogenious).T)
-
-            pts_obj = (pose.T@X_homogenious)
-            pts_obj/= pts_obj[3]
-            map.append((np.linalg.inv(K)@X).T)
-
-            #print(pts_obj.T)
-            #print(X_homogenious.T)
-            #print((pts_obj[0:3,:]).T)
-            #print((poses[-1][0:3,0:4]@ X_homogenious).T)
-            #self.pts_obj @ self.pose.T
-            #print(pose)
-            #print(np.shape(pose.T @ X_homogenious))
-            viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (np.linalg.inv(K)@X).T, colour=np.array([[0],[0],[0]]).T)
-
+            pts_obj = (np.linalg.inv(poses[-2]) @ triangulatedPoints).T
+            pts_obj = pts_obj[:,:3] / np.asarray(pts_obj[:,-1]).reshape(-1,1)
+            viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = pts_obj, colour=np.array([[0],[0],[0]]).T)
+            
+            ###########################
+            
+            #print(np.shape(X))
+            #X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
+            #pts_obj = (pose.T@X_homogenious)
+            #pts_obj/= pts_obj[3]
+            
+            map.append(pts_obj)
+            #print(X[:,:10].T)
+            #viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (X).T, colour=np.array([[0],[0],[0]]).T)
             # Display
-            #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches[:100],None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches,None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
             #cv2.imshow('a', img3)
-            #cv2.waitKey(1)
+            #cv2.waitKey(0)
             prev_frame = cur_frame
     viewer.stop()
     
@@ -240,6 +214,7 @@ if __name__=="__main__":
     #print(map)
     # Data for a three-dimensional line
     for p,m in zip(poses,map):
+        """
         if (np.min(m[:,0]) <-1000 or np.max(m[:,0]) >1000):
             continue
         if (np.min(m[:,2]) <-1000 or np.max(m[:,2]) >1000):
@@ -247,6 +222,7 @@ if __name__=="__main__":
         if (np.min(m[:,1]) <-1000 or np.max(m[:,1]) >1000):
             continue
             #print(p[0,3])
+        """
         ax.scatter(m[:,0],m[:,1],m[:,2],c='blue',marker="o")
         ax.scatter(p[0,3], p[1,3], p[2,3], c='red', marker="p")
     plt.show()

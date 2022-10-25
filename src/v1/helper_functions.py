@@ -28,11 +28,7 @@ def MatchPoints(kp1, kp2, matches):
         pts1.append(kp1[m[0].queryIdx].pt)
     pts1  = np.asarray(pts1)
     pts2 = np.asarray(pts2)
-    # normalize points
-    #pts_l_norm = cv2.undistortPoints(np.expand_dims(pts1, axis=1), cameraMatrix=K, distCoeffs=None)
-    #pts_r_norm = cv2.undistortPoints(np.expand_dims(pts2, axis=1), cameraMatrix=K, distCoeffs=None)
     return pts1, pts2
-
 # used in transformation score calculation
 def matlab_max(v, s):
         return [max(v[i],s) for i in range(len(v))]
@@ -47,30 +43,19 @@ def estimateEssential(pts1, pts2, K, essTh):
     # https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
     inlierPoints1 = pts1[inliers[:, 0] == 1, :]
     inlierPoints2 = pts2[inliers[:, 0] == 1, :]
-    
-    
+    # compute epipolar lines in img2 and measure distances of match points to the lines
     lineIn1 = cv2.computeCorrespondEpilines(inlierPoints2.reshape(-1,1,2), 2,E) # original with F
     lineIn1 = lineIn1.reshape(-1,3)
-    
-
-    inliersIndex  = np.where(inliers==1)
-
+    #inliersIndex  = np.where(inliers==1)
     locations1 = (np.concatenate(    (inlierPoints1, np.ones((np.shape(inlierPoints1)[0], 1)))    , axis=1))
     locations2 = (np.concatenate(    (inlierPoints2, np.ones((np.shape(inlierPoints2)[0], 1)))   , axis=1))
-    
     error2in1 = (np.sum(locations1 * lineIn1, axis = 1))**2 / np.sum(lineIn1[:,:3]**2, axis=1)
-    
+    # compute epipolar lines in img2 and measure distances of match points to the lines
     lineIn2 = cv2.computeCorrespondEpilines(inlierPoints1.reshape(-1,1,2), 2,E) # original with F
     lineIn2 = lineIn2.reshape(-1,3)
-    
     error1in2 = (np.sum(locations2 * lineIn2, axis = 1))**2 / np.sum(lineIn2[:,:3]**2, axis=1)
-    
-    
     outlierThreshold = 4
-
     score = np.sum(matlab_max(outlierThreshold-error1in2, 0)) + sum(matlab_max(outlierThreshold-error2in1, 0))
-
-
 
     return E, inliers, score
         
@@ -78,21 +63,16 @@ def estimateEssential(pts1, pts2, K, essTh):
 def estimateHomography(pts1, pts2, homTh):
     #H, inliers = cv2.findHomography(pts1, pts2, cv2.RANSAC, ransacReprojThreshold=3.0/homTh)
     H, inliers = cv2.findHomography(pts1, pts2, cv2.RANSAC, ransacReprojThreshold=homTh)
-
     inlierPoints1 = pts1[inliers[:, 0] == 1, :]
     inlierPoints2 = pts2[inliers[:, 0] == 1, :]
-
-    inliersIndex  = np.where(inliers==1)
-
+    #inliersIndex  = np.where(inliers==1)
     locations1 = (np.concatenate(    (inlierPoints1, np.ones((np.shape(inlierPoints1)[0], 1)))    , axis=1))
     locations2 = (np.concatenate(    (inlierPoints2, np.ones((np.shape(inlierPoints2)[0], 1)))   , axis=1))
     xy1In2     = (H @ locations1.T).T
     xy2In1     = (np.linalg.inv(H) @ locations2.T).T
     error1in2  = np.sum((locations2 - xy1In2)**2, axis=1)
     error2in1  = np.sum((locations1 - xy2In1)**2, axis=1)
-
     outlierThreshold = 6
-
     score = np.sum(matlab_max(outlierThreshold-error1in2, 0)) + np.sum(matlab_max(outlierThreshold-error2in1, 0))
 
     return H, inliers, score
@@ -183,9 +163,10 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         
     elif tform_type == "Essential":
         # recoverpose way:
-        points, R, t, inliers = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K)
-        validFraction = points / np.shape(inliers)[0]
-        return R, t, validFraction 
+        retval, R, t, mask, triangulatedPoints = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K, distanceThresh=1000)
+        # recoverPose(E, points1, points2, cameraMatrix, distanceThresh[, R[, t[, mask[, triangulatedPoints]]]]) -> retval, R, t, mask, triangulatedPoints
+        validFraction = 1 # points / np.shape(inliers)[0]
+        return R, t, validFraction, triangulatedPoints
         # decompose essential matrix into 4 possible solutions
         R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
@@ -201,7 +182,7 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         print("Unknown tform_type")
         return None, None, 0
     
-def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_threshold = 1, min_parallax = 4):
+def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_threshold = 1, min_parallax = 4, debug = False):
     """Triangulation to get 3D points
     Initial version of trigualation
     Might be error prone
@@ -215,15 +196,16 @@ def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_thresho
         X1 (3xN): 3D coordinates of the keypoints w.r.t view1 coordinate
         X2 (3xN): 3D coordinates of the keypoints w.r.t view2 coordinate
     """
-    kp1 = np.squeeze(cv2.undistortPoints(kp1_non_norm, cameraMatrix=K, distCoeffs=None))
-    kp2 = np.squeeze(cv2.undistortPoints(kp2_non_norm, cameraMatrix=K, distCoeffs=None))
+    # points1u = cv2.undistortPoints(points1, mtx1, dist1, None, mtx1)
+    kp1 = np.squeeze(cv2.undistortPoints(kp1_non_norm, K, None, None, K)) # kp1_non_norm # 
+    kp2 = np.squeeze(cv2.undistortPoints(kp2_non_norm, K, None, None, K)) # np.squeeze(cv2.undistortPoints(kp2_non_norm, cameraMatrix=K, distCoeffs=None)) #    
     kp1_3D = np.ones((3, kp1.shape[0]))
     kp2_3D = np.ones((3, kp2.shape[0]))
     kp1_3D[0], kp1_3D[1] = kp1[:, 0].copy(), kp1[:, 1].copy()
     kp2_3D[0], kp2_3D[1] = kp2[:, 0].copy(), kp2[:, 1].copy()
-    X = cv2.triangulatePoints(T_1w[:3], T_2w[:3], kp1_3D[:2], kp2_3D[:2])
-    #print(X)
-    X /= X[3]
+    #X = cv2.triangulatePoints(K@T_1w[:3], K@T_2w[:3], kp1_3D[:2], kp2_3D[:2])
+    X = cv2.triangulatePoints(K @ T_1w[:3], K @ T_2w[:3], kp1_3D[:2], kp2_3D[:2])
+    X /= X[3:4]
     X1 = T_1w[:3] @ X
     X2 = T_2w[:3] @ X
     # get reprojection error
@@ -231,30 +213,29 @@ def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_thresho
     # Our poses (estimated from essential matrix) already account for camera intrinsics (K)
     proj_points2 = X2.copy()
     proj_points2 /= proj_points2[2] # normalize to homogenous coordinates
-    print("org")
-    print(kp2[0])
-    print("proj")
-    print(proj_points2[:,0])
-
     err2 = np.abs(kp2 - proj_points2[:2].T)
-    #print(err2)
     # do the same for first image
     proj_points1 = X1.copy()
     proj_points1 /= proj_points1[2]
     err1 = np.abs(kp1 - proj_points1[:2].T)
-    reprojection_error = np.mean(np.concatenate((err1, err2), axis=0), axis=1)
+    reprojection_error = np.mean(np.concatenate((err1, err2), axis=1), axis=1)
     # a good two-view with significant parallax
     ray1 = X - np.expand_dims(T_1w[:, 3], axis=1)
     ray2 = X - np.expand_dims(T_2w[:, 3], axis=1)
-    cosangle = np.sum(ray1 * ray2, axis=0) / (   np.linalg.norm(ray1, axis=0)*np.linalg.norm(ray2, axis=0)  )    
+    cosangle = 180/np.pi * np.arccos(np.sum(ray1 * ray2, axis=0) / (   np.linalg.norm(ray1, axis=0)*np.linalg.norm(ray2, axis=0)  ))
+    inliers = (reprojection_error < reprojection_threshold) & (cosangle > min_parallax)
     
-    # get inliers
-    #print("cosangle")
-    #print(np.shape(cosangle))
-    #print("reprojection error")
-    #print(np.shape(reprojection_error))
-    #print(reprojection_error < reprojection_threshold)
-    #inliers = all(reprojection_error < reprojection_threshold and cosangle > np.arccos(min_parallax))
-    #print("jee")
-    inliers = 0
+    if debug:
+        print("Original matches in image 2: ")
+        print(kp2_non_norm[:10])
+        #print("(normalized)")
+        #print((K.T @ kp2_3D[:,:10]).T)
+        print("Projected points from triangulation:")
+        print(proj_points2[:2,:10].T)
+        print("Mean reprojection_error: ", np.mean(reprojection_error))
+        #print(reprojection_error[:100])
+        print("Mean projection angle (parallax): ", np.mean(cosangle))
+        #print(cosangle[:100])
+        print("inliers (= reprojection error < 5 (px) and parallax > 3 (degrees): ", np.shape(np.where((reprojection_error < 5) & (cosangle > 3)))[1])
+    
     return X[:3], X1, X2, inliers

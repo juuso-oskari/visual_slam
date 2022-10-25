@@ -134,7 +134,7 @@ class Viewer(object):
             if len(trajectory) > 0:
                 gl.glPointSize(8)
                 gl.glColor3f(0.0, 1.0, 0.0)
-                pangolin.DrawPoints(trajectory.array())
+                pangolin.DrawLine(trajectory.array())
 
             # show map
             if len(mappoints) > 0 and len(pts_color)>0:
