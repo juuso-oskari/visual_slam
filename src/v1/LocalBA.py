@@ -2,7 +2,6 @@ import numpy as np
 import g2o
 #import cv2
 
-#def localBundleAdjustement(ba, W_pose1, kp1,  pose1_id, W_pose2, kp2, pose2_id, W_triangulatedPoints, points_ID):
 def localBundleAdjustement(BA, KeyFrames):
     # Loop over all the keyframes
     for frame in KeyFrames:
@@ -13,6 +12,7 @@ def localBundleAdjustement(BA, KeyFrames):
             point_xyz, image_point = frame.landmarks[landmark_id]
             BA.add_point(landmark_id, point_xyz)
             BA.add_edge(landmark_id, frame.ID, image_point)
+
 
 
 class BundleAdjustment(g2o.SparseOptimizer):

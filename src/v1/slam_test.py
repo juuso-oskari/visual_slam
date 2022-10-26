@@ -59,8 +59,9 @@ class Frame:
         self.depth = cv2.imread(d_path)
         self.keypoints, self.features  = None, None
         self.feature_extractor = feature_extractor
-        self.Pose = None
-        self.ID = None
+        self.ID, self.pose = None, None
+        self.landmarks = {}
+        
     def process_frame(self):
         self.keypoints, self.features = self.feature_extract(self.rgb)
         return self.keypoints, self.features, self.rgb
@@ -68,11 +69,17 @@ class Frame:
     def feature_extract(self, rgb):
         return self.feature_extractor.compute_features(rgb)
 
+    def StoreLandmark(self, landmarkID, xyzPoint, imagePoint):
+        self.landmarks[landmarkID] = [xyzPoint, imagePoint]
+
+
+
+
 
 class Point:
     def __init__(self, xyz):
         self.xyz = xyz
-        self.projections = {} # (key,value)-pairs, key: pose (ID) where this point is visible from, value: projection
+        self.projections = {} # (key,value)-pairs, key: pose (ID) where this point is visible from, value: projection to image plane
     def AddProjection(self, poseID, kp):
         self.projections[poseID] = kp
     def GetProjection(self, poseID):
@@ -139,6 +146,7 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     map = []
+    KeyFrames = [cur_frame]
     
     # Map initialization
     for i in range(2,1200):
@@ -202,11 +210,10 @@ if __name__=="__main__":
             inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
-            R, t, validFraction, triangulatedPoints = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
+            R, t, validFraction, triangulatedPoints, inlierPrePoints, inlierCurrPoints = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
             if(validFraction < 0.9):
                 continue
             # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
-            #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
             PointTransformation = Isometry3d(R=R, t=np.squeeze(t)).matrix()
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
             pose = RelativePoseTransformation @ poses[-1]
@@ -223,6 +230,16 @@ if __name__=="__main__":
             #cv2.waitKey(0)
             prev_frame = cur_frame
             break
+        
+    KeyFrames.append(cur_frame)
+    landmark_id = "landmark".encode('utf-8').hex() + hex(1)
+    for point3d, imagepoint1, imagepoint2 in zip(triangulatedPoints, inlierPrePoints, inlierCurrPoints):
+        KeyFrames[-2].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint1)
+        KeyFrames[-1].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint2)
+    
+    
+    
+    
     viewer.stop()
     
     
