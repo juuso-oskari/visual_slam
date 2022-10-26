@@ -9,13 +9,10 @@ def localBundleAdjustement(BA, KeyFrames):
         # Add every keyframe to posegraph
         BA.add_pose(frame.ID, frame.pose)
         # Loop over all 3d points that the frame sees
-        for id_point in frame.landmarks.keys: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
-            point_xyz, image_point = frame.landmarks[id_point]
-            BA.add_point(id_point, point_xyz)
-            BA.add_edge(id_point, frame.ID, image_point)
-
-
-        
+        for landmark_id in frame.landmarks.keys: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
+            point_xyz, image_point = frame.landmarks[landmark_id]
+            BA.add_point(landmark_id, point_xyz)
+            BA.add_edge(landmark_id, frame.ID, image_point)
 
 
 class BundleAdjustment(g2o.SparseOptimizer):
@@ -71,3 +68,4 @@ class BundleAdjustment(g2o.SparseOptimizer):
 
     def get_point(self, point_id):
         return self.vertex(point_id * 2 + 1).estimate()
+
