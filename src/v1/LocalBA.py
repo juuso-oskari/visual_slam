@@ -2,26 +2,43 @@ import numpy as np
 import g2o
 #import cv2
 
+def localBundleAdjustement(ba, W_pose1, kp1,  pose1_id, W_pose2, kp2, pose2_id, W_triangulatedPoints, points_ID):
+    ba.add_pose(pose1_id, W_pose1)
+    ba.add_pose(pose2_id, W_pose2)
+    
+    
+    
+    
+    for p, pid in zip(W_triangulatedPoints,  points_ID):
+        ba.add_point(pid, p)
+        ba.add_edge(pid, pose1_id, )
+        
+
+
 class BundleAdjustment(g2o.SparseOptimizer):
-    def __init__(self, ):
+    def __init__(self, camera):
         super().__init__()
         solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
         solver = g2o.OptimizationAlgorithmLevenberg(solver)
         super().set_algorithm(solver)
+        # TODO: understand how to get focal length from x y
+        f = (camera.fx + camera.fy) / 2.0
+        cam = g2o.CameraParameters(f, (camera.cx, camera.cy), 0)
+        cam.set_id(0)
+        super().add_parameter(cam)
 
     def optimize(self, max_iterations=10):
         super().initialize_optimization()
         super().optimize(max_iterations)
 
-    def add_pose(self, pose_id, pose, cam, fixed=False):
-        sbacam = g2o.SBACam(pose.orientation(), pose.position())
-        sbacam.set_cam(cam.fx, cam.fy, cam.cx, cam.cy, cam.baseline)
-
-        v_se3 = g2o.VertexCam()
+    def add_pose(self, pose_id, pose, fixed=False):
+        se3 = g2o.SEQuat(pose.rotation(), pose.translation())
+        v_se3 = g2o.VertexSE3Expmap()
         v_se3.set_id(pose_id * 2)   # internal id
-        v_se3.set_estimate(sbacam)
+        v_se3.set_estimate(se3)
         v_se3.set_fixed(fixed)
-        super().add_vertex(v_se3) 
+        super().add_vertex(v_se3)
+        # TODO: check pose correctness 
 
     def add_point(self, point_id, point, fixed=False, marginalized=True):
         v_p = g2o.VertexSBAPointXYZ()
@@ -36,7 +53,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
             information=np.identity(2),
             robust_kernel=g2o.RobustKernelHuber(np.sqrt(5.991))):   # 95% CI
 
-        edge = g2o.EdgeProjectP2MC()
+        edge = g2o.EdgeProjectXYZ2UV()
         edge.set_vertex(0, self.vertex(point_id * 2 + 1))
         edge.set_vertex(1, self.vertex(pose_id * 2))
         edge.set_measurement(measurement)   # projection

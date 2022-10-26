@@ -59,12 +59,35 @@ class Frame:
         self.depth = cv2.imread(d_path)
         self.keypoints, self.features  = None, None
         self.feature_extractor = feature_extractor
+        self.Pose = None
+        self.ID = None
     def process_frame(self):
         self.keypoints, self.features = self.feature_extract(self.rgb)
         return self.keypoints, self.features, self.rgb
         
     def feature_extract(self, rgb):
         return self.feature_extractor.compute_features(rgb)
+
+
+class Point:
+    def __init__(self, xyz):
+        self.xyz = xyz
+        self.projections = {} # (key,value)-pairs, key: pose (ID) where this point is visible from, value: projection
+    def AddProjection(self, poseID, kp):
+        self.projections[poseID] = kp
+    def GetProjection(self, poseID):
+        return self.projections[poseID]
+
+
+class Camera:
+    def __init__(self, fx, fy, cx, cy, baseline=1):
+        self.fx = fx
+        self.fy = fy
+        self.cx = cx
+        self.cy = cy
+        self.baseline = baseline
+        
+
 
 class Isometry3d(object):
     """3d rigid transform."""
@@ -81,7 +104,11 @@ class Isometry3d(object):
     def __mul__(self, T1):
         R = self.R @ T1.R
         t = self.R @ T1.t + self.t
-        return Isometry3d(R, t)    
+        return Isometry3d(R, t)   
+    def orientation(self):
+        return self.R
+    def position(self):
+        return self.t
 
 if __name__=="__main__":
     # Global variables
