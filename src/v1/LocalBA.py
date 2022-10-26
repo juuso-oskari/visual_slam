@@ -2,17 +2,6 @@ import numpy as np
 import g2o
 #import cv2
 
-def localBundleAdjustement(ba, W_pose1, kp1,  pose1_id, W_pose2, kp2, pose2_id, W_triangulatedPoints, points_ID):
-    ba.add_pose(pose1_id, W_pose1)
-    ba.add_pose(pose2_id, W_pose2)
-    
-    
-    
-    
-    for p, pid in zip(W_triangulatedPoints,  points_ID):
-        ba.add_point(pid, p)
-        ba.add_edge(pid, pose1_id, )
-        
 
 
 class BundleAdjustment(g2o.SparseOptimizer):
