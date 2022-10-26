@@ -8,6 +8,7 @@ import time
 import os 
 from pathlib import Path
 import re
+from LocalBA import BundleAdjustment
 from viewer import Viewer
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -72,7 +73,9 @@ class Frame:
     def StoreLandmark(self, landmarkID, xyzPoint, imagePoint):
         self.landmarks[landmarkID] = [xyzPoint, imagePoint]
 
-
+    def AddPose(self, id, pose):
+        self.pose = pose
+        self.ID = id
 
 
 
@@ -231,12 +234,28 @@ if __name__=="__main__":
             prev_frame = cur_frame
             break
         
+    # Initialize BundleAdjustement
+    camera = Camera(fx,fy,cx,cy)
+    BA = BundleAdjustment(camera)
+    
+    
     KeyFrames.append(cur_frame)
-    landmark_id = "landmark".encode('utf-8').hex() + hex(1)
-    for point3d, imagepoint1, imagepoint2 in zip(triangulatedPoints, inlierPrePoints, inlierCurrPoints):
+    Pose_id = 1 #"pose".encode('utf-8').hex() + hex(1)
+    KeyFrames[0].AddPose(Pose_id, poses[0])
+    Pose_id += 1
+    KeyFrames[1].AddPose(Pose_id, poses[-1])
+    
+    
+    landmark_id = 20 # "landmark".encode('utf-8').hex() + hex(1)
+    print(np.shape(triangulatedPoints))
+    for point3d, imagepoint1, imagepoint2 in zip(pts_obj, inlierPrePoints, inlierCurrPoints):
         KeyFrames[-2].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint1)
         KeyFrames[-1].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint2)
+        landmark_id += 1 # hex(1)
     
+    
+    
+    BA.localBundleAdjustement(KeyFrames)
     
     
     
