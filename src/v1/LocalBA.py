@@ -3,14 +3,14 @@ import g2o
 #import cv2
 
 #def localBundleAdjustement(ba, W_pose1, kp1,  pose1_id, W_pose2, kp2, pose2_id, W_triangulatedPoints, points_ID):
-def localBundleAdjustement(BA, KeyFrames)
+def localBundleAdjustement(BA, KeyFrames):
     # Loop over all the keyframes
     for frame in KeyFrames:
         # Add every keyframe to posegraph
         BA.add_pose(frame.ID, frame.pose)
         # Loop over all 3d points that the frame sees
-        for id_point in frame.points3d.keys: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
-            point_xyz, image_point = frame.point3d[id_point]
+        for id_point in frame.landmarks.keys: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
+            point_xyz, image_point = frame.landmarks[id_point]
             BA.add_point(id_point, point_xyz)
             BA.add_edge(id_point, frame.ID, image_point)
 
