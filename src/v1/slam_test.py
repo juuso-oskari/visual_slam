@@ -112,8 +112,11 @@ if __name__=="__main__":
     kp, features, rgb = cur_frame.process_frame() 
     prev_frame = cur_frame
     map = []
+    
+    # Map initialization
     for i in range(2,1200):
-        if i % 20 == 0:
+        if i % 1 == 0:
+            print(i)
             fp_rgb = dir_rgb + str(i) + ".png"
             fp_depth = dir_depth + str(i) + ".png"
             # Feature Extraction for current frame
@@ -124,14 +127,13 @@ if __name__=="__main__":
             # if not enough matches (<100) continue to next frame
             if(len(matches) < 100):
                 print("too few matches")
-                pass # continue
+                continue # continue
+            
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
             # match and normalize keypoints
             # CAUTION: normalizing or not normalizing change the results so be careful
             #preMatchedPoints, curMatchedPoints = MatchAndNormalize(prev_frame.keypoints, cur_frame.keypoints, matches, K)
             preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.keypoints, cur_frame.keypoints, matches)
-            print(np.shape(preMatchedPoints))
-            print(preMatchedPoints[:10])
             # compute homography and inliers
             #H, inliersH, scoreH  = estimateHomography(preMatchedPoints, curMatchedPoints, homTh=4.0) # ransac threshold as last argument
             scoreH = 0
@@ -174,47 +176,38 @@ if __name__=="__main__":
             inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
             # get pose transformation (use only half of the points for faster computation)
             R, t, validFraction, triangulatedPoints = estimateRelativePose(tform, inlierPrePoints[::2], inlierCurrPoints[::2], K, tform_type)
-            
             if(validFraction < 0.9):
-                pass #continue
+                continue
             # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
             #RelativePoseTransformation = np.linalg.inv(np.vstack((np.hstack((R,t[:,np.newaxis])), np.array([0,0,0,1]))))
             PointTransformation = Isometry3d(R=R, t=np.squeeze(t)).matrix()
             RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
-            #print(RelativePoseTransformation.T@RelativePoseTransformation)
             pose = RelativePoseTransformation @ poses[-1]
             poses.append(pose)
             
             pts_obj = (np.linalg.inv(poses[-2]) @ triangulatedPoints).T
             pts_obj = pts_obj[:,:3] / np.asarray(pts_obj[:,-1]).reshape(-1,1)
             viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = pts_obj, colour=np.array([[0],[0],[0]]).T)
-            
-            ###########################
-            
-            #print(np.shape(X))
-            #X_homogenious = np.concatenate((X, np.ones((1,np.shape(X)[1]))))
-            #pts_obj = (pose.T@X_homogenious)
-            #pts_obj/= pts_obj[3]
-            
             map.append(pts_obj)
-            #print(X[:,:10].T)
-            #viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = (X).T, colour=np.array([[0],[0],[0]]).T)
             # Display
             #img3 = cv2.drawMatchesKnn(prev_frame.rgb,prev_frame.keypoints, cur_frame.rgb,cur_frame.keypoints,matches,None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
             #img2 = cv2.drawKeypoints(rgb, kp, None, color=(0,255,0), flags=0)
             #cv2.imshow('a', img3)
             #cv2.waitKey(0)
             prev_frame = cur_frame
+            break
     viewer.stop()
     
+    
+    
+    
 
-
+    """
     fig = plt.figure()
     ax = plt.axes(projection='3d')
     #print(map)
     # Data for a three-dimensional line
     for p,m in zip(poses,map):
-        """
         if (np.min(m[:,0]) <-1000 or np.max(m[:,0]) >1000):
             continue
         if (np.min(m[:,2]) <-1000 or np.max(m[:,2]) >1000):
@@ -222,9 +215,8 @@ if __name__=="__main__":
         if (np.min(m[:,1]) <-1000 or np.max(m[:,1]) >1000):
             continue
             #print(p[0,3])
-        """
         ax.scatter(m[:,0],m[:,1],m[:,2],c='blue',marker="o")
         ax.scatter(p[0,3], p[1,3], p[2,3], c='red', marker="p")
     plt.show()
-
+    """
     

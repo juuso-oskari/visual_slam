@@ -163,10 +163,18 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         
     elif tform_type == "Essential":
         # recoverpose way:
-        retval, R, t, mask, triangulatedPoints = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K, distanceThresh=1000)
-        # recoverPose(E, points1, points2, cameraMatrix, distanceThresh[, R[, t[, mask[, triangulatedPoints]]]]) -> retval, R, t, mask, triangulatedPoints
-        validFraction = 1 # points / np.shape(inliers)[0]
-        return R, t, validFraction, triangulatedPoints
+        _, R, t, mask, triangulatedPoints = cv2.recoverPose(tform, inlier_pts1, inlier_pts2, cameraMatrix=K, distanceThresh=50)
+        triangulatedPoints_good = []
+        
+        validFraction = 0
+        for i,m in enumerate(mask):
+            if m[0] == 255:
+                validFraction += 1
+                triangulatedPoints_good.append(triangulatedPoints[:,i])
+        
+        validFraction = validFraction / np.shape(inlier_pts1)[0]
+        triangulatedPoints_good = np.array(triangulatedPoints_good).T
+        return R, t, validFraction, triangulatedPoints_good
         # decompose essential matrix into 4 possible solutions
         R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
