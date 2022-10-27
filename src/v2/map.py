@@ -29,5 +29,8 @@ class Map:
             self.points_3d[point_id].UpdatePoint(new_point)
         else:
             raise Exception("No frame yet added") 
+    
+    def GetFrame(self, frame_id):
+        return self.frames[frame_id]
 
         

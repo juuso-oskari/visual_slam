@@ -62,13 +62,60 @@ if __name__=="__main__":
     viewer = Viewer()
     feature_extractor = FeatureExtractor()
     feature_matcher = FeatureMatcher()
+    map = Map()
     cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
-    id_pose = 0 # even numbers for the poses
+    id_frame = 0 # even numbers for the poses
     id_point = 1 # odd numbers for the 3d points
-    cur_frame.AddPose(id=id_pose, init_pose=np.eye(4)) # initial pose (identity) and id
-    kp, features, rgb = cur_frame.process_frame()
-    prev_frame = cur_frame
+    cur_frame.AddPose(id=id_frame, init_pose=np.eye(4)) # initial pose (identity) and id
+    cur_frame.SetAsKeyFrame()   # Set initial frame to be keyframe
+    cur_frame.AddParent(None) # set parent to None for initial frame
+    kp, features, rgb = cur_frame.process_frame() # Process frame features etc
 
+    # Add inital frame to map
+    map.AddFrame(frame_id=id_frame, frame=cur_frame)
+    id_frame = id_frame + id_frame
 
+    #cur_frame.UpdatePose(np.eye(4)*100)
+    #print(cur_frame.GetPose())
+    #print(map.GetFrame(id_frame).GetPose())
+    
+    for i in range(2,1200):
+        
+        fp_rgb = dir_rgb + str(i) + ".png"
+        fp_depth = dir_depth + str(i) + ".png"
 
+        # Feature Extraction for current frame
+        prev_frame = map.GetFrame(id_frame-1) # Get previous frame from the map class
+        cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
+        prev_frame.AddChild(cur_frame) # Add Child frame to previous frame
+        cur_frame.AddParent(prev_frame) # Add prev frame as a parent to current frame
+        kp, features, rgb = cur_frame.process_frame() 
+        matches = feature_matcher.match_features(prev_frame, cur_frame)
+        if( len(matches) < 100 ) :
+            continue
+        # Match corresponding image points
+        preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.GetKeyPoints(), cur_frame.GetKeyPoints(), matches)
+        ## compute essential and inliers
+        E, inliers , score = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
+        # Leave only inliers based on geometric verification
+        inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
+        inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
+        # get pose transformation (use only half of the points for faster computation)
+        R, t, validFraction, triangulatedPoints, inlierPrePoints, inlierCurrPoints = estimateRelativePose(E, inlierPrePoints[::2], inlierCurrPoints[::2], K, "Essential")
+        if(validFraction < 0.9):
+            continue
+        # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+        RelativePoseTransformation = Isometry3d(R=R, t=np.squeeze(t)).inverse().matrix()
+        # Calculate current frame pose in world coordinate system
+        pose = RelativePoseTransformation @ prev_frame.GetPose()
+        cur_frame.AddPose(id=id_frame, init_pose=np.eye(4)) # initial pose (identity) and id
 
+        # Transform triagualted points to world frame
+        pts_obj = (np.linalg.inv(prev_frame.GetPose()) @ triangulatedPoints).T
+        pts_obj = pts_obj[:,:3] / np.asarray(pts_obj[:,-1]).reshape(-1,1)
+        # Update viewer
+        viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = pts_obj, colour=np.array([[0],[0],[0]]).T)
+
+        
+
+        break

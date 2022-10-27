@@ -30,38 +30,55 @@ class FeatureMatcher():
                 matches.append([m])
         return matches
 
-
 class Frame:
     def __init__(self, rgb_fp, d_path, feature_extractor):
+        # Image related attributes
         self.rgb = cv2.imread(rgb_fp)
         self.depth = cv2.imread(d_path)
         self.keypoints, self.features  = None, None
         self.feature_extractor = feature_extractor
+
+        # Camera related attributed
         self.ID, self.pose = None, None
-        self.landmarks = {}
-        
+        # Parent frames
+        self.parents = []
+        # Child frames
+        self.childs = []
+        # keyframe flag, determines if the 
+        self.keyframe = False
+
+
+    # Processes the frame by calling feature_extract method
     def process_frame(self):
         self.keypoints, self.features = self.feature_extract(self.rgb)
         return self.keypoints, self.features, self.rgb
-        
+
+    # Extracts features by calling method compute_features that is implemeted in class FeatureExtractor
     def feature_extract(self, rgb):
         return self.feature_extractor.compute_features(rgb)
 
-    def StoreLandmark(self, landmarkID, xyzPoint, imagePoint):
-        self.landmarks[landmarkID] = [xyzPoint, imagePoint]
-
+    # Adds initial pose. ie this function adds pose that corresponds to this frame (Before any optimization),
     def AddPose(self, id, init_pose):
         self.pose = init_pose
         self.ID = id
     
+    # Pose is here updated by the pose that is obtained from optimization.
     def UpdatePose(self, new_pose):
         self.pose = new_pose
+
+    # AddParent adds parent frame to frame class. Parent frame can for example be previous keyframe before this frame.
+    def AddParent(self, parent_frame):
+        self.parents.append(parent_frame)
+
+    # AddChild adds child frame to this frame.
+    def AddChild(self, child_frame):
+        self.childs.append(child_frame)
     
-    def UpdateLandmark(self, landmarkID, new_xyzPoint):
-        self.landmarks[landmarkID] = [new_xyzPoint, self.landmarks[landmarkID][1]]        
-        
-    def GetAll3dPoints(self):
-        points3d = []
-        for key in self.landmarks:
-            points3d.append(self.landmarks[key][0])
-        return np.squeeze(np.array(points3d))
+    def GetPose(self):
+        return self.pose
+
+    def SetAsKeyFrame(self):
+        self.keyframe = True
+
+    def GetKeyPoints(self):
+        return self.keypoints
