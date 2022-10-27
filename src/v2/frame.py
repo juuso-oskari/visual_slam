@@ -31,7 +31,7 @@ class FeatureMatcher():
         return matches
 
 class Frame:
-    def __init__(self, rgb_fp, d_path, feature_extractor):
+    def __init__(self, rgb_fp, d_path, feature_extractor, id):
         # Image related attributes
         self.rgb = cv2.imread(rgb_fp)
         self.depth = cv2.imread(d_path)
@@ -39,7 +39,8 @@ class Frame:
         self.feature_extractor = feature_extractor
 
         # Camera related attributed
-        self.ID, self.pose = None, None
+        self.ID = id 
+        self.pose = None # Pose estimation might fail for some frames
         # Parent frames
         self.parents = []
         # Child frames
@@ -58,9 +59,8 @@ class Frame:
         return self.feature_extractor.compute_features(rgb)
 
     # Adds initial pose. ie this function adds pose that corresponds to this frame (Before any optimization),
-    def AddPose(self, id, init_pose):
+    def AddPose(self, init_pose):
         self.pose = init_pose
-        self.ID = id
     
     # Pose is here updated by the pose that is obtained from optimization.
     def UpdatePose(self, new_pose):
@@ -82,3 +82,6 @@ class Frame:
 
     def GetKeyPoints(self):
         return self.keypoints
+    
+    def GetID(self):
+        return self.ID

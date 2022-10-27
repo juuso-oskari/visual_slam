@@ -1,3 +1,4 @@
+from pickle import TRUE
 import numpy as np
 import g2o
 #import cv2
@@ -72,33 +73,21 @@ class BundleAdjustment(g2o.SparseOptimizer):
     def get_point(self, point_id):
         return self.vertex(point_id * 2 + 1).estimate()
 
-    def localBundleAdjustement(self, KeyFrames):
-        # Loop over all the keyframes
-        i = 0
-        for frame in KeyFrames:
-            # Add every keyframe to posegraph
-            if(i==0):
-                self.add_pose(frame.ID, frame.pose, fixed=True)
+    def localBundleAdjustement(self, map):
+        frame_ids = map.frames.keys()
+        point_ids = map.points_3d.keys()
+        for frame_id in frame_ids:
+            frame_obj = map.GetFrame(frame_id)
+            if(frame_id== 0):
+                self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set initial frame as fixed (origo)
             else:
-                self.add_pose(frame.ID, frame.pose, fixed=False)
-            
-            i = i + 1
-            # Loop over all 3d points that the frame sees
-            for landmark_id in frame.landmarks: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
-                point_xyz, image_point = frame.landmarks[landmark_id]
-                self.add_point(landmark_id, point_xyz.T)
-                self.add_edge(landmark_id, frame.ID, image_point)
-        
-        self.optimize()
-        
-        
-        # Fetch the optimized results
-        for frame in KeyFrames:
-            # Add every keyframe to posegraph
-            frame.UpdatePose(self.get_pose(frame.ID).matrix())
-            # Loop over all 3d points that the frame sees
-            for landmark_id in frame.landmarks: # points3d is a dictionary where key is id and value is list of xyz point and original detection point in image 
-                point_xyz, image_point = frame.landmarks[landmark_id]
-                frame.UpdateLandmark(landmark_id, self.get_point(landmark_id))
+                self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
+        print("prööt")  
+        for point_id in point_ids:
+            point_obj = map.GetPoint(point_id)
+            print(point_obj)
+            self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
+            for frame, uv in point_obj.frames:
+                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
                 
-        
+        self.optimize()

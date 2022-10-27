@@ -32,5 +32,8 @@ class Map:
     
     def GetFrame(self, frame_id):
         return self.frames[frame_id]
+    
+    def GetPoint(self, point_id):
+        return self.points_3d[point_id]
 
         

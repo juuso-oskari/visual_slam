@@ -8,9 +8,7 @@ class Point:
         self.location_3d = location
 
     def AddFrame(self, frame,uv):
-        u = uv[0]
-        v = uv[1]
-        self.frames.append((frame, (u,v)))
+        self.frames.append((frame, uv))
 
 
     def UpdatePoint(self, new_location):
@@ -21,3 +19,7 @@ class Point:
         for frame, uv in self.frames:
             if (frame_id == frame.ID):
                 return uv
+            
+            
+    def Get3dPoint(self):
+        return self.location_3d
