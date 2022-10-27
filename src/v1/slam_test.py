@@ -54,6 +54,11 @@ class FeatureMatcher():
                 matches.append([m])
         return matches
 
+
+
+
+
+
 class Frame:
     def __init__(self, rgb_fp, d_path, feature_extractor):
         self.rgb = cv2.imread(rgb_fp)
@@ -73,10 +78,21 @@ class Frame:
     def StoreLandmark(self, landmarkID, xyzPoint, imagePoint):
         self.landmarks[landmarkID] = [xyzPoint, imagePoint]
 
-    def AddPose(self, id, pose):
-        self.pose = pose
+    def AddPose(self, id, init_pose):
+        self.pose = init_pose
         self.ID = id
-
+    
+    def UpdatePose(self, new_pose):
+        self.pose = new_pose
+    
+    def UpdateLandmark(self, landmarkID, new_xyzPoint):
+        self.landmarks[landmarkID] = [new_xyzPoint, self.landmarks[landmarkID][1]]        
+        
+    def GetAll3dPoints(self):
+        points3d = []
+        for key in self.landmarks:
+            points3d.append(self.landmarks[key][0])
+        return np.squeeze(np.array(points3d))
 
 
 class Point:
@@ -150,7 +166,7 @@ if __name__=="__main__":
     prev_frame = cur_frame
     map = []
     KeyFrames = [cur_frame]
-    
+
     # Map initialization
     for i in range(2,1200):
         if i % 1 == 0:
@@ -160,13 +176,9 @@ if __name__=="__main__":
             # Feature Extraction for current frame
             cur_frame = Frame(fp_rgb, fp_depth, feature_extractor)
             kp, features, rgb = cur_frame.process_frame()
-            # Feature Matching to previous frame
-            matches = feature_matcher.match_features(prev_frame, cur_frame)    
-            # if not enough matches (<100) continue to next frame
-            if(len(matches) < 100):
-                print("too few matches")
-                continue # continue
-            
+            matches = feature_matcher.match_features(prev_frame, cur_frame)
+            if( len(matches) < 100 ) :
+                continue
             # https://www.programcreek.com/python/example/70413/cv2.RANSAC
             # match and normalize keypoints
             # CAUTION: normalizing or not normalizing change the results so be careful
@@ -197,7 +209,6 @@ if __name__=="__main__":
             ratioThreshold = 0.45
             if ratio > ratioThreshold:
                 inliers = inliersH
-                tform = H
                 tform_type = "Homography"
                 print("Chose homography")
             else:
@@ -246,8 +257,7 @@ if __name__=="__main__":
     KeyFrames[1].AddPose(Pose_id, poses[-1])
     
     
-    landmark_id = 20 # "landmark".encode('utf-8').hex() + hex(1)
-    print(np.shape(triangulatedPoints))
+    landmark_id = 2000 # "landmark".encode('utf-8').hex() + hex(1)
     for point3d, imagepoint1, imagepoint2 in zip(pts_obj, inlierPrePoints, inlierCurrPoints):
         KeyFrames[-2].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint1)
         KeyFrames[-1].StoreLandmark(landmark_id, xyzPoint=point3d, imagePoint=imagepoint2)
@@ -261,9 +271,13 @@ if __name__=="__main__":
     
     viewer.stop()
     
+    viewer2 = Viewer()
+    
+    for kf in KeyFrames:
+        viewer2.update_pose(pose = g2o.Isometry3d(kf.pose), cloud = kf.GetAll3dPoints(), colour=np.array([[0],[0],[0]]).T)
     
     
-    
+    viewer2.stop()
 
     """
     fig = plt.figure()
