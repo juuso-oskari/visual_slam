@@ -4,10 +4,10 @@ import cv2
 class Point:
     def __init__(self, location, id):
         self.ID = id
-        self.frames = [] # list of tuples. (frame, (u,v)). Where u,v is the 2d location on the image plane of the frame
+        self.frames = [] # list of tuples. (frame, uv). Where uv is the 2d location on the image plane of the frame
         self.location_3d = location
 
-    def AddFrame(self, frame,uv):
+    def AddFrame(self, frame, uv):
         self.frames.append((frame, uv))
 
 

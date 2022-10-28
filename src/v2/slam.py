@@ -52,7 +52,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + str(1) + ".png"
@@ -75,10 +75,6 @@ if __name__=="__main__":
     # Add inital frame to map
     map.AddFrame(frame_id=id_frame, frame=cur_frame)
     id_frame = id_frame + 1
-
-    #cur_frame.UpdatePose(np.eye(4)*100)
-    #print(cur_frame.GetPose())
-    #print(map.GetFrame(id_frame).GetPose())
     
     for i in range(2,1200):
         
@@ -113,7 +109,7 @@ if __name__=="__main__":
         cur_frame.AddParent(parent_frame=prev_frame) # Add prev frame as a parent to current frame
         cur_frame.AddPose(init_pose=pose) # Add pose calculated to the current frame
         map.AddFrame(frame_id=id_frame, frame=cur_frame) # Add current frame to the map
-
+        id_frame = id_frame + 1
         # Transform triagualted points to world frame
         pts_objs = (np.linalg.inv(prev_frame.GetPose()) @ triangulatedPoints).T
         pts_objs = pts_objs[:,:3] / np.asarray(pts_objs[:,-1]).reshape(-1,1) 
@@ -135,7 +131,33 @@ if __name__=="__main__":
     # local bundleadjustement
     camera = Camera(fx,fy,cx,cy)
     BA = BundleAdjustment(camera)
+    
+    last_keyframe = cur_frame
     BA.localBundleAdjustement(map)
+    # visualize the initialized map
+    viewer2 = Viewer()
+    map.visualize_map(viewer2)
+    viewer2.stop()
+    
+    
+    # Start local tracking mapping process
+    loop_idx = i
+    for i in range(loop_idx, 1200):
+        # features are extracted for each new frame
+        # and then matched (using matchFeatures), with features in the last key frame
+        # that have known corresponding 3-D map points. 
+        fp_rgb = dir_rgb + str(i) + ".png"
+        fp_depth = dir_depth + str(i) + ".png"
+        cur_frame = Frame(fp_rgb, fp_depth, feature_extractor, id=id_frame)
+        kp, features, rgb = cur_frame.process_frame() 
+        # Get features in the last key frame with known 3D-points
+        
+        matches = feature_matcher.match_features(, cur_frame)
+    
+    loop_idx = i
+    
+    
+    
     
     
     

@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+import g2o
 
 class Map:
     def __init__(self):
@@ -13,6 +13,26 @@ class Map:
             raise Exception("Duplicate frame warning")
         self.frames[frame_id] = frame 
 
+    def GetPointsWithFrameID(self, frame_id):
+        image_points = []
+        for point_obj in self.points_3d.values():
+            image_points.append(point_obj.GetImagePoint(frame_id))
+            
+        return image_points
+    
+    
+    def GetAll3DPoints(self):
+        allpoints = []
+        for point_obj in self.points_3d.values():
+            allpoints.append(point_obj.location_3d)
+        return np.array(allpoints).reshape(-1,3)
+    
+    def GetAllPoses(self):
+        allposes = []
+        for frame_obj in self.frames.values():
+            allposes.append(frame_obj.GetPose())
+        return allposes
+    
     def AddPoint3D(self, point_id, point_3d):
         if point_id in self.points_3d.keys():
             raise Exception("Duplicate point3d warning")
@@ -25,10 +45,10 @@ class Map:
             raise Exception("No frame yet added")
 
     def UpdatePoint3D(self, new_point, point_id):
-        if point_id not in self.frames.keys():   
+        if point_id in self.points_3d.keys():   
             self.points_3d[point_id].UpdatePoint(new_point)
         else:
-            raise Exception("No frame yet added") 
+            raise Exception("No point yet added") 
     
     def GetFrame(self, frame_id):
         return self.frames[frame_id]
@@ -36,4 +56,11 @@ class Map:
     def GetPoint(self, point_id):
         return self.points_3d[point_id]
 
-        
+    def visualize_map(self, viewer):
+        i = 0
+        for pose in self.GetAllPoses():
+            if i==0:
+                viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = self.GetAll3DPoints(), colour=np.array([[0],[0],[0]]).T)
+            else:
+                viewer.update_pose(pose = g2o.Isometry3d(pose), colour=np.array([[0],[0],[0]]).T)
+            i += 1 # draw points only for the first iteration

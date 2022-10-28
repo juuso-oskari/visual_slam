@@ -1,6 +1,7 @@
 from pickle import TRUE
 import numpy as np
 import g2o
+from map import *
 #import cv2
 """
 def localBundleAdjustement(BA, KeyFrames):
@@ -77,7 +78,6 @@ class BundleAdjustment(g2o.SparseOptimizer):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
-            print(frame_id)
             frame_obj = map.GetFrame(frame_id)
             if(frame_id== 0):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set initial frame as fixed (origo)
@@ -89,6 +89,15 @@ class BundleAdjustment(g2o.SparseOptimizer):
             for frame, uv in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
-        print("ruljahti")
-                
+        # run the optimization
         self.optimize()
+        # update map
+        for frame_id in frame_ids:
+            map.UpdatePose(new_pose = self.get_pose(frame_id).matrix(), frame_id = frame_id)
+        for point_id in point_ids:
+            map.UpdatePoint3D(new_point = self.get_point(point_id), point_id = point_id)
+            
+        
+        
+                
+        
