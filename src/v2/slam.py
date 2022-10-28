@@ -52,7 +52,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + str(1) + ".png"
@@ -85,6 +85,7 @@ if __name__=="__main__":
         prev_frame = map.GetFrame(id_frame-1) # Get previous frame from the map class
         cur_frame = Frame(fp_rgb, fp_depth, feature_extractor, id=id_frame)
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame() 
+        # pts1, ft1, pts2, ft2
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
         if( len(matches) < 100 ) :
             continue
@@ -95,11 +96,13 @@ if __name__=="__main__":
         E, inliers , score = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
         # Leave only inliers based on geometric verification
         inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
-        inlierPreFeatures = preMatchedFeatures[inliers[:, 0] == 1, :]
+        inlierPreFeatures = preMatchedFeatures[inliers[:, 0] == 1, :]    
         inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
         inlierCurrFeatures = curMatchedFeatures[inliers[:, 0] == 1, :]
         # get pose transformation (use only half of the points for faster computation)
-        R, t, validFraction, triangulatedPoints, inlierPrePoints, inlierCurrPoints = estimateRelativePose(E, inlierPrePoints[::2], inlierCurrPoints[::2], K, "Essential")
+        # SOlution by the gooods
+        R, t, validFraction, triangulatedPoints, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures = estimateRelativePose(E, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures, K, "Essential")
+        
         if(validFraction < 0.9):
             continue
         # according to https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
@@ -136,17 +139,17 @@ if __name__=="__main__":
     camera = Camera(fx,fy,cx,cy)
     BA = BundleAdjustment(camera)
     
-    last_keyframe = cur_frame
+    
     BA.localBundleAdjustement(map)
     # visualize the initialized map
     viewer2 = Viewer()
     map.visualize_map(viewer2)
     viewer2.stop()
-    
+    # store last keyframe
+    last_keyframe = map.GetFrame(frame_id=id_frame-1)
     
     # Start local tracking mapping process
     loop_idx = i
-    print(loop_idx)
     for i in range(loop_idx, 40):
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -154,11 +157,17 @@ if __name__=="__main__":
         fp_rgb = dir_rgb + str(i) + ".png"
         fp_depth = dir_depth + str(i) + ".png"
         cur_frame = Frame(fp_rgb, fp_depth, feature_extractor, id=id_frame)
+        id_frame = id_frame + 1
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame() # This returns keypoints as numpy.ndarray
         # Get keypoints and features in the last key frame corresponding to known 3D-points
         kp_prev, features_prev = map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
+        print(type(features_prev))
+        print(np.shape(features_prev))
+        #print(features_prev[:10])
+        print(type(features_cur))
+        print(np.shape(features_cur))
+        #print(features_prev[:10])
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
-
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(0)

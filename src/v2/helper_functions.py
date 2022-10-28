@@ -161,7 +161,7 @@ def chooseRealizableSolution(Rs, Ts, K, points1, points2):
     return R, t, validFraction
 
 
-def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essential"):
+def estimateRelativePose(tform, inlier_pts1, inlier_pts2, inlier_fts1, inlier_fts2, K, tform_type = "Essential"):
     if tform_type == "Homography":
         # decompose homography into 4 possible solutions
         num, Rs, Ts, Ns  = cv2.decomposeHomographyMat(tform, K=np.eye(3))
@@ -177,6 +177,8 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
         triangulatedPoints_good = []
         inlier_pts1_good = []
         inlier_pts2_good = []
+        inlier_fts1_good = []
+        inlier_fts2_good = []
         
         validFraction = 0
         for i,m in enumerate(mask):
@@ -185,10 +187,12 @@ def estimateRelativePose(tform, inlier_pts1, inlier_pts2, K, tform_type = "Essen
                 triangulatedPoints_good.append(triangulatedPoints[:,i])
                 inlier_pts1_good.append(inlier_pts1[i])
                 inlier_pts2_good.append(inlier_pts2[i])
+                inlier_fts1_good.append(inlier_fts1[i])
+                inlier_fts2_good.append(inlier_fts2[i])
         
         validFraction = validFraction / np.shape(inlier_pts1)[0]
         triangulatedPoints_good = np.array(triangulatedPoints_good).T
-        return R, t, validFraction, triangulatedPoints_good, inlier_pts1_good, inlier_pts2_good
+        return R, t, validFraction, triangulatedPoints_good, inlier_pts1_good, inlier_pts2_good, inlier_fts1_good, inlier_fts2_good
         # decompose essential matrix into 4 possible solutions
         R1, R2, t = cv2.decomposeEssentialMat(tform)
         # The possible solutions are (R1,t), (R1,-t), (R2,t), (R2,-t)
