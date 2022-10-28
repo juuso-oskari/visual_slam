@@ -21,14 +21,30 @@ class FeatureMatcher():
         rawMatches = self.matcher.knnMatch(desc1,desc2,k=2)
         # perform Lowe's ratio test to get actual matches
         matches = []
+        pts1 = [] # matched image points in img1
+        pts2 = [] # matched image points in img2
+        ft1 = [] # matched features in img1
+        ft2 = [] # matched features in img2
         for m, n in rawMatches:
             # ensure the distance is within a certain ratio of each
             # other (i.e. Lowe's ratio test)
             if m.distance < ratio * n.distance:
                 # here queryIdx corresponds to kpsA
                 # trainIdx corresponds to kpsB
+                pts2.append(kp2[m.trainIdx].pt)
+                pts1.append(kp1[m.queryIdx].pt)
+                #pts1.append(kp1[m.queryIdx])
+                #pts2.append(kp2[m.trainIdx])
+                ft1.append(desc1[m.queryIdx])
+                ft2.append(desc2[m.trainIdx])
                 matches.append([m])
-        return matches
+        
+        pts1  = np.asarray(pts1)
+        pts2 = np.asarray(pts2)
+        ft1  = np.asarray(ft1)
+        ft2 = np.asarray(ft2)
+        
+        return matches, pts1, ft1, pts2, ft2
 
 class Frame:
     def __init__(self, rgb_fp, d_path, feature_extractor, id):

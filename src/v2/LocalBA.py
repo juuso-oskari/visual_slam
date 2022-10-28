@@ -86,7 +86,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
-            for frame, uv in point_obj.frames:
+            for frame, uv, descriptor in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
         # run the optimization

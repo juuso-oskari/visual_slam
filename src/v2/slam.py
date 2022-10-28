@@ -85,16 +85,19 @@ if __name__=="__main__":
         prev_frame = map.GetFrame(id_frame-1) # Get previous frame from the map class
         cur_frame = Frame(fp_rgb, fp_depth, feature_extractor, id=id_frame)
         kp, features, rgb = cur_frame.process_frame() 
-        matches = feature_matcher.match_features(prev_frame, cur_frame)
+        matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(prev_frame, cur_frame)
         if( len(matches) < 100 ) :
             continue
         # Match corresponding image points
-        preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.GetKeyPoints(), cur_frame.GetKeyPoints(), matches)
+        #preMatchedPoints, curMatchedPoints = MatchPoints(prev_frame.GetKeyPoints(), cur_frame.GetKeyPoints(), matches)
+        #preMatchedFeatures, curMatchedFeatures = MatchFeatures(prev_frame.GetFeatures(), cur_frame.GetFeatures(), matches)
         ## compute essential and inliers
         E, inliers , score = estimateEssential(preMatchedPoints, curMatchedPoints, K, essTh=3.0 / K[0,0])
         # Leave only inliers based on geometric verification
         inlierPrePoints = preMatchedPoints[inliers[:, 0] == 1, :]
+        inlierPreFeatures = preMatchedFeatures[inliers[:, 0] == 1, :]
         inlierCurrPoints = curMatchedPoints[inliers[:, 0] == 1, :]
+        inlierCurrFeatures = curMatchedFeatures[inliers[:, 0] == 1, :]
         # get pose transformation (use only half of the points for faster computation)
         R, t, validFraction, triangulatedPoints, inlierPrePoints, inlierCurrPoints = estimateRelativePose(E, inlierPrePoints[::2], inlierCurrPoints[::2], K, "Essential")
         if(validFraction < 0.9):
@@ -117,10 +120,10 @@ if __name__=="__main__":
         viewer.update_pose(pose = g2o.Isometry3d(pose), cloud = pts_objs, colour=np.array([[0],[0],[0]]).T)
         # reaches this point only when new keyframe is found
         # -> so add the triangulated point objects to map
-        for pt, uv1, uv2 in zip(pts_objs, inlierPrePoints, inlierCurrPoints):
+        for pt, uv1, uv2, ft1, ft2 in zip(pts_objs, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures):
             pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
-            pt_object.AddFrame(frame=prev_frame, uv=uv1) # Add first frame to the point object. This is frame where the point was detected
-            pt_object.AddFrame(frame=cur_frame, uv=uv2)# Add second frame to the point object. This is frame where the point was detected
+            pt_object.AddFrame(frame=prev_frame, uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
+            pt_object.AddFrame(frame=cur_frame, uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
             map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
             id_point = id_point + 1  # Increment point id
         cur_frame.SetAsKeyFrame()  # Sets cur frame as the keyframe
@@ -139,7 +142,7 @@ if __name__=="__main__":
     map.visualize_map(viewer2)
     viewer2.stop()
     
-    
+    """
     # Start local tracking mapping process
     loop_idx = i
     for i in range(loop_idx, 1200):
@@ -151,11 +154,11 @@ if __name__=="__main__":
         cur_frame = Frame(fp_rgb, fp_depth, feature_extractor, id=id_frame)
         kp, features, rgb = cur_frame.process_frame() 
         # Get features in the last key frame with known 3D-points
-        
+        map.GetFrame
         matches = feature_matcher.match_features(, cur_frame)
     
     loop_idx = i
-    
+    """
     
     
     

@@ -7,8 +7,8 @@ class Point:
         self.frames = [] # list of tuples. (frame, uv). Where uv is the 2d location on the image plane of the frame
         self.location_3d = location
 
-    def AddFrame(self, frame, uv):
-        self.frames.append((frame, uv))
+    def AddFrame(self, frame, uv, descriptor):
+        self.frames.append((frame, uv, descriptor))
 
 
     def UpdatePoint(self, new_location):
