@@ -13,12 +13,18 @@ class Map:
             raise Exception("Duplicate frame warning")
         self.frames[frame_id] = frame 
 
-    def GetPointsWithFrameID(self, frame_id):
+
+    # Get image points and corresponding descriptors
+    # Returns list of tuples (uv, feat)
+    def GetImagePointsWithFrameID(self, frame_id):
         image_points = []
+        descriptors = []
         for point_obj in self.points_3d.values():
-            image_points.append(point_obj.GetImagePoint(frame_id))
-            
-        return image_points
+            # get image points from tuple
+            image_points.append(point_obj.GetImagePoint(frame_id)[0])  
+            # get descriptor from tuple
+            descriptors.append(point_obj.GetImagePoint(frame_id)[1])  
+        return np.array(image_points), np.array(descriptors)
     
     
     def GetAll3DPoints(self):

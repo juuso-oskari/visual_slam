@@ -2,6 +2,16 @@ import numpy as np
 import cv2
 import sys
 
+def Numpy2Keypoint(np_keypoints):
+    step_size = 5
+    cv2_keypoints = []
+    for i in range(len(np_keypoints)):
+        x = np_keypoints[i,0]
+        y = np_keypoints[i,1]
+        cv2_keypoints.append(cv2.KeyPoint(x, y, step_size))
+
+    return cv2_keypoints
+
 # Matches and normalizes keypoints in 2 frames, needed in many estimations to prevent numerical instability
 def MatchAndNormalize(kp1, kp2, matches, K):
     # match keypoints
