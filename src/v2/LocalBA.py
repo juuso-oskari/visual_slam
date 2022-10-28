@@ -77,17 +77,18 @@ class BundleAdjustment(g2o.SparseOptimizer):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
+            print(frame_id)
             frame_obj = map.GetFrame(frame_id)
             if(frame_id== 0):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set initial frame as fixed (origo)
             else:
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
-        print("prööt")  
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
-            print(point_obj)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
             for frame, uv in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
+
+        print("ruljahti")
                 
         self.optimize()
