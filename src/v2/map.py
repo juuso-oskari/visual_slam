@@ -19,12 +19,15 @@ class Map:
     def GetImagePointsWithFrameID(self, frame_id):
         image_points = []
         descriptors = []
+        locations_3d = []
         for point_obj in self.points_3d.values():
             # get image points from tuple
             image_points.append(point_obj.GetImagePoint(frame_id)[0])  
             # get descriptor from tuple
-            descriptors.append(point_obj.GetImagePoint(frame_id)[1])  
-        return np.array(image_points), np.array(descriptors)
+            descriptors.append(point_obj.GetImagePoint(frame_id)[1]) 
+            # get the known 3d location
+            locations_3d.append(point_obj.Get3dPoint()) 
+        return np.array(image_points), np.array(descriptors), np.array(locations_3d)
     
     
     def GetAll3DPoints(self):

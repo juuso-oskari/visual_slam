@@ -144,13 +144,14 @@ if __name__=="__main__":
     # visualize the initialized map
     viewer2 = Viewer()
     map.visualize_map(viewer2)
-    viewer2.stop()
+    
     # store last keyframe
     last_keyframe = map.GetFrame(frame_id=id_frame-1)
     
+    pose22 = last_keyframe.GetPose()
     # Start local tracking mapping process
     loop_idx = i
-    for i in range(loop_idx, 40):
+    for i in range(loop_idx, 100):
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -160,18 +161,21 @@ if __name__=="__main__":
         id_frame = id_frame + 1
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame() # This returns keypoints as numpy.ndarray
         # Get keypoints and features in the last key frame corresponding to known 3D-points
-        kp_prev, features_prev = map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
-        print(type(features_prev))
-        print(np.shape(features_prev))
-        #print(features_prev[:10])
-        print(type(features_cur))
-        print(np.shape(features_cur))
-        #print(features_prev[:10])
+        kp_prev, features_prev, known_3d = map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
-        img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imshow('a', img3)
-        cv2.waitKey(0)
+        # get matched 3d locations
+        known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
+        # Estimate the camera pose with the Perspective-n-Point algorithm.
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d, curMatchedPoints, K, D, useExtrinsicGuess=False)
+        RelativePoseTransformation = transformMatrix(rvec, tvec)
+        
+        pose22 = RelativePoseTransformation @ pose22
+        viewer2.update_pose(pose = g2o.Isometry3d(pose22), cloud = None, colour=np.array([[0],[0],[0]]).T)
+        #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        #cv2.imshow('a', img3)
+        #cv2.waitKey(0)
 
+    viewer2.stop()
     print("Ruljhati")
     loop_idx = i
     

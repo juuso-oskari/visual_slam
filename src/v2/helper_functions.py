@@ -265,3 +265,10 @@ def triangulation(kp1_non_norm, kp2_non_norm, T_1w, T_2w, K,reprojection_thresho
         print("inliers (= reprojection error < 5 (px) and parallax > 3 (degrees): ", np.shape(np.where((reprojection_error < 5) & (cosangle > 3)))[1])
     
     return X[:3], X1, X2, inliers
+
+def transformMatrix(rvec, tvec):
+        r, t = np.matrix(rvec), np.matrix(tvec)
+        R, _ = cv2.Rodrigues(r)
+        Rt = np.hstack((R, t))
+        T = np.vstack((Rt, np.matrix([0, 0, 0, 1])))
+        return T
