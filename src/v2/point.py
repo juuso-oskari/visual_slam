@@ -16,10 +16,9 @@ class Point:
 
     # Gets image point (2d) based on frame id
     def GetImagePoint(self, frame_id):
-        for frame, uv in self.frames:
+        for frame, uv, descriptor in self.frames:
             if (frame_id == frame.ID):
-                return uv
-            
+                return (uv, descriptor)
             
     def Get3dPoint(self):
         return self.location_3d

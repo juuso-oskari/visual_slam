@@ -9,14 +9,14 @@ class FeatureExtractor:
         pts = cv2.goodFeaturesToTrack(np.mean(img, axis=2).astype(np.uint8), 3000, qualityLevel=0.01, minDistance=7)
         kps = [cv2.KeyPoint(x=f[0][0], y=f[0][1], size=20) for f in pts]
         kp, des = self.extractor.compute(img, kps)
-        return kp, des
+        return cv2.KeyPoint_convert(kp), des
 
 class FeatureMatcher():
     def __init__(self):
         self.matcher = cv2.BFMatcher()
-    def match_features(self, frame_prev, frame_cur, ratio = 0.8):
-        kp1, desc1 = frame_prev.keypoints, frame_prev.features
-        kp2, desc2 = frame_cur.keypoints, frame_cur.features
+
+    def match_features(self, kp1, desc1, kp2, desc2, ratio = 0.8):
+
         # Match descriptors.
         rawMatches = self.matcher.knnMatch(desc1,desc2,k=2)
         # perform Lowe's ratio test to get actual matches
@@ -31,8 +31,8 @@ class FeatureMatcher():
             if m.distance < ratio * n.distance:
                 # here queryIdx corresponds to kpsA
                 # trainIdx corresponds to kpsB
-                pts2.append(kp2[m.trainIdx].pt)
-                pts1.append(kp1[m.queryIdx].pt)
+                pts2.append(kp2[m.trainIdx])
+                pts1.append(kp1[m.queryIdx])
                 #pts1.append(kp1[m.queryIdx])
                 #pts2.append(kp2[m.trainIdx])
                 ft1.append(desc1[m.queryIdx])

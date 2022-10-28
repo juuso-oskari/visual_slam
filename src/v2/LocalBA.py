@@ -31,7 +31,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
 
     def optimize(self, max_iterations=10, verbose=True):
         super().initialize_optimization()
-        super().set_verbose(verbose)
+        #super().set_verbose(verbose)
         super().optimize(max_iterations)
         
 
