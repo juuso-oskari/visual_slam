@@ -55,12 +55,13 @@ if __name__=="__main__":
     fx, fy, cx, cy = 535.4, 539.2, 320.1, 247.6
     
     # Filepaths
-    rgb_images = os.listdir("../../data/rgbd_dataset_freiburg3_long_office_household/rgb")
-
+    rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
+    rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
     cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
+    print(fp_rgb)
     fp_depth = dir_depth + str(1) + ".png"
 
     # Initializations of classes
@@ -81,7 +82,7 @@ if __name__=="__main__":
     map.AddFrame(frame_id=id_frame, frame=cur_frame)
     id_frame = id_frame + 1
     
-    for i in range(2,1200):
+    for i in range(1,1200):
         fp_rgb = dir_rgb + rgb_images[i] #str(i) + ".png"
         fp_depth = dir_depth + str(i) + ".png"
         # Feature Extraction for current frame
@@ -156,7 +157,7 @@ if __name__=="__main__":
     pose22 = last_keyframe.GetPose()
     # Start local tracking mapping process
     loop_idx = i
-    for i in range(loop_idx, 100):
+    for i in range(loop_idx, 1200):
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -186,7 +187,7 @@ if __name__=="__main__":
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         pose22 = Isometry3d(R=r, t=t).inverse().matrix()
         #pose22 = Isometry3d(R = RelativePoseTransformation[0:3,0:3], t=np.squeeze(tvec)).inverse().matrix()
-        #viewer2.update_pose(pose = g2o.Isometry3d(pose22), cloud = None, colour=np.array([[0],[0],[0]]).T)
+        viewer2.update_pose(pose = g2o.Isometry3d(pose22), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(0)
