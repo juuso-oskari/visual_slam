@@ -52,7 +52,7 @@ if __name__=="__main__":
     K = np.matrix([[481.20, 0, 319.5], [0, 480.0, 239.5], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     # Filepaths
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/ICL_NUIM/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + str(1) + ".png"
@@ -151,7 +151,7 @@ if __name__=="__main__":
     pose22 = last_keyframe.GetPose()
     # Start local tracking mapping process
     loop_idx = i
-    for i in range(loop_idx, 100):
+    for i in range(loop_idx, 50):
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -166,10 +166,14 @@ if __name__=="__main__":
         # get matched 3d locations
         known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
         # Estimate the camera pose with the Perspective-n-Point algorithm.
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d, curMatchedPoints, K, D, useExtrinsicGuess=False)
+        temp = np.expand_dims(np.ones_like(known_3d[:,0]), axis=1)
+        known_3d_in_cur_frame = pose22 @ np.concatenate((known_3d, temp), axis=1).T
+        print(np.shape(known_3d_in_cur_frame))
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_in_cur_frame[0:3,:].T, curMatchedPoints, K, D, useExtrinsicGuess=False)
+        print(rvec)
         RelativePoseTransformation = transformMatrix(rvec, tvec)
         
-        pose22 = RelativePoseTransformation @ pose22
+        pose22 = np.linalg.inv(RelativePoseTransformation) @ pose22
         viewer2.update_pose(pose = g2o.Isometry3d(pose22), cloud = None, colour=np.array([[0],[0],[0]]).T)
         #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         #cv2.imshow('a', img3)
