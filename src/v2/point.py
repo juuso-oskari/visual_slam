@@ -22,3 +22,6 @@ class Point:
             
     def Get3dPoint(self):
         return self.location_3d
+    
+    def GetVectorNorm(self):
+        return np.linalg.norm(self.location_3d)

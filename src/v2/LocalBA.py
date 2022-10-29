@@ -74,7 +74,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
     def get_point(self, point_id):
         return self.vertex(point_id * 2 + 1).estimate()
 
-    def localBundleAdjustement(self, map):
+    def localBundleAdjustement(self, map, scale=False):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
@@ -91,11 +91,20 @@ class BundleAdjustment(g2o.SparseOptimizer):
 
         # run the optimization
         self.optimize()
+        median_depth = 1
+        if scale:
+            vector_norms = []
+            for point_id in point_ids:
+                vector_norms.append(np.linalg.norm(self.get_point(point_id)))
+            median_depth = np.median(np.array(vector_norms))
+        
         # update map
         for frame_id in frame_ids:
-            map.UpdatePose(new_pose = self.get_pose(frame_id).matrix(), frame_id = frame_id)
+            new_pose = self.get_pose(frame_id).matrix()
+            new_pose[0:3,3] /= median_depth
+            map.UpdatePose(new_pose = new_pose, frame_id = frame_id)
         for point_id in point_ids:
-            map.UpdatePoint3D(new_point = self.get_point(point_id), point_id = point_id)
+            map.UpdatePoint3D(new_point = self.get_point(point_id)/median_depth, point_id = point_id)
             
         
         

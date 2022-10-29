@@ -128,7 +128,7 @@ class Viewer(object):
             if camera is not None:
                 gl.glLineWidth(1)
                 gl.glColor3f(0.0, 0.0, 1.0)
-                pangolin.DrawCameras(np.array([camera]), 0.3)
+                pangolin.DrawCameras(np.array([camera]), 0.03)
 
             # show trajectory
             if len(trajectory) > 0:
