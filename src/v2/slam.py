@@ -168,6 +168,7 @@ if __name__=="__main__":
     pose = last_keyframe.GetPose()
     
     loop_idx = i
+    init = True
     for i in range(loop_idx, 150):
         print("Image index: ", i)
         # features are extracted for each new frame
@@ -200,13 +201,19 @@ if __name__=="__main__":
         cur_frame.AddPose(init_pose=pose) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
         id_frame_local = id_frame_local + 1
-        # Do motion only bundle adjustement with local map
-        localBA.motionOnlyBundleAdjustement(local_map, scale=True)
+        # Do motion only bundle adjustement with local map (add global map points on first iteration)
+        if init:
+            localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=True)
+            init = False
+        else:
+            localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=False)
         local_map.visualize_map(viewer=viewer2)
         #viewer2.update_pose(pose = g2o.Isometry3d(pose), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(1)
+
+    
 
     viewer2.stop()
     print("Ruljhati")

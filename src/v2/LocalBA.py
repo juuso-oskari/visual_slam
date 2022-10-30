@@ -130,8 +130,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
             
         
     # differs from localBundleAdjustement by setting map points as fixed and estimating motion (poses) only
-    # runs the risk of updating map points and keyframe
-    def motionOnlyBundleAdjustement(self, map, scale=False):
+    # if init is set to True, adds the points in the map to graph (should be done only once)
+    def motionOnlyBundleAdjustement(self, map, scale=False, init=False):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
@@ -148,7 +148,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
                     self.add_edge_between_poses(vertices=[parent_ID, frame_id], measurement=frame_obj.GetTransitionWithParentID(parent_ID))
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
-            self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # set all global map points as fixed
+            if init:
+                self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # set all global map points as fixed
             for frame, uv, descriptor in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
