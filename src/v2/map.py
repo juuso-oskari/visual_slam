@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import g2o
+from copy import deepcopy
 
 class Map:
     def __init__(self):
@@ -36,15 +37,14 @@ class Map:
             allpoints.append(point_obj.location_3d)
         return np.array(allpoints).reshape(-1,3)
     
-    
+    # Get copy of points objects visible to frame with frame_id 
     def GetCopyOfPointObjects(self, frame_id):
-        image_points = []
-        descriptors = []
-        locations_3d = []
-        for point_obj in self.points_3d.values():
-            # get the known 3d location
-            locations_3d.append(point_obj) 
-        return np.array(image_points), np.array(descriptors), np.array(locations_3d)
+        points = {}
+        for point_key in self.points_3d.keys():
+            point_obj = self.points_3d[point_key]
+            if point_obj.IsVisibleTo(frame_id):
+                points[point_key] = deepcopy(point_obj)
+        return points
     
     def GetAllPoses(self):
         allposes = []
@@ -83,3 +83,8 @@ class Map:
             else:
                 viewer.update_pose(pose = g2o.Isometry3d(pose), colour=np.array([[0],[0],[0]]).T)
             i += 1 # draw points only for the first iteration
+            
+    # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression
+    # Merge new dictionary of points into 3d map points
+    def Store3DPoints(self, points_dict):
+        self.points_3d = {**self.points_3d, **points_dict}

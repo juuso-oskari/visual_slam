@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from copy import deepcopy
 
 class FeatureExtractor:
     def __init__(self):
@@ -47,38 +48,42 @@ class FeatureMatcher():
         return matches, pts1, ft1, pts2, ft2
 
 class Frame:
-    def __init__(self, rgb_fp, d_path, feature_extractor, id):
+    def __init__(self, rgb_fp, d_path, id):
         # Image related attributes
         self.rgb = cv2.imread(rgb_fp)
         self.depth = cv2.imread(d_path)
         self.keypoints, self.features  = None, None
-        self.feature_extractor = feature_extractor
+        #self.feature_extractor = feature_extractor
 
         # Camera related attributed
         self.ID = id 
         self.pose = None # Pose estimation might fail for some frames
+        # TODO: The following should also store the transitions between frames
         # Parent frames
-        self.parents = []
+        self.parents = {} # key: parent_frame_id, value : transition from parent to current frame
         # Child frames
         self.childs = []
         # keyframe flag, determines if the 
         self.keyframe = False
 
+    # AddParent adds parent frame to frame class. Parent frame is added as {parent_id : transition between parent and current frame} key-value pair
+    def AddParent(self, parent_frame_id, transition):
+        self.parents[parent_frame_id] = transition
     
-    def __copy__(self):
-        new_frame = Frame()
-        new_frame.rgb = self.rgb
-        new_frame.depth = self.depth
-        #new. = self.keypoints, self.features
-
+    def GetParentIDs(self):
+        return self.parents.keys()
+    
+    def GetTransitionWithParentID(self, parent_id):
+        return self.parents[parent_id]
+        
     # Processes the frame by calling feature_extract method
-    def process_frame(self):
-        self.keypoints, self.features = self.feature_extract(self.rgb)
+    def process_frame(self, feature_extractor):
+        self.keypoints, self.features = self.feature_extract(self.rgb, feature_extractor)
         return self.keypoints, self.features, self.rgb
 
     # Extracts features by calling method compute_features that is implemeted in class FeatureExtractor
-    def feature_extract(self, rgb):
-        return self.feature_extractor.compute_features(rgb)
+    def feature_extract(self, rgb, feature_extractor):
+        return feature_extractor.compute_features(rgb)
 
     # Adds initial pose. ie this function adds pose that corresponds to this frame (Before any optimization),
     def AddPose(self, init_pose):
@@ -88,9 +93,6 @@ class Frame:
     def UpdatePose(self, new_pose):
         self.pose = new_pose
 
-    # AddParent adds parent frame to frame class. Parent frame can for example be previous keyframe before this frame.
-    def AddParent(self, parent_frame):
-        self.parents.append(parent_frame)
 
     # AddChild adds child frame to this frame.
     def AddChild(self, child_frame):

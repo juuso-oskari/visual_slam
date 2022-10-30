@@ -68,6 +68,22 @@ class BundleAdjustment(g2o.SparseOptimizer):
             edge.set_robust_kernel(robust_kernel)
         super().add_edge(edge)
 
+    
+    def add_edge_between_poses(self, vertices, measurement=None, information=np.eye(6), robust_kernel=g2o.RobustKernelHuber(np.sqrt(5.991))):
+        edge = g2o.EdgeSE3()
+        for i, v in enumerate(vertices):
+            if isinstance(v, int):
+                v = self.vertex(v)
+            edge.set_vertex(i, v)
+
+        edge.set_measurement(g2o.Isometry3d(measurement))  # relative pose transformation between frames
+        edge.set_information(information)
+        if robust_kernel is not None:
+            edge.set_robust_kernel(robust_kernel)
+        super().add_edge(edge)
+    
+    
+    
     def get_pose(self, pose_id):
         return self.vertex(pose_id * 2).estimate()
 
@@ -83,6 +99,12 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set initial frame as fixed (origo)
             else:
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
+                for parent_ID in frame_obj.GetParentIDs():
+                    # add edge between parent and current frame (usually previous and current frame, with loop closure as exception)
+                    self.add_edge_between_poses(vertices=[parent_ID, frame_id], measurement=frame_obj.GetTransitionWithParentID(parent_ID))
+            
+            
+            
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
@@ -118,9 +140,15 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set key frame as fixed
             else:
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
+                for parent_ID in frame_obj.GetParentIDs():
+                    # add edge between parent and current frame (usually previous and current frame, with loop closure as exception)
+                    print("Parent and child")
+                    print(parent_ID)
+                    print(frame_id)
+                    self.add_edge_between_poses(vertices=[parent_ID, frame_id], measurement=frame_obj.GetTransitionWithParentID(parent_ID))
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
-            self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True)
+            self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # set all global map points as fixed
             for frame, uv, descriptor in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
