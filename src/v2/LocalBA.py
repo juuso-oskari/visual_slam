@@ -142,9 +142,6 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
                 for parent_ID in frame_obj.GetParentIDs():
                     # add edge between parent and current frame (usually previous and current frame, with loop closure as exception)
-                    print("Parent and child")
-                    print(parent_ID)
-                    print(frame_id)
                     self.add_edge_between_poses(vertices=[parent_ID, frame_id], measurement=frame_obj.GetTransitionWithParentID(parent_ID))
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
@@ -154,6 +151,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
         # run the optimization
+        self.initialize_optimization()
         self.optimize()
         median_depth = 1
         if scale:
