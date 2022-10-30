@@ -166,10 +166,10 @@ if __name__=="__main__":
     # Store current pose into pose
     pose = last_keyframe.GetPose()
     
-    loop_idx = i
-    init = True
+    loop_idx = i # continue where map initialization left off
     for i in range(loop_idx, 50):
         print("Image index: ", i)
+        
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -185,34 +185,41 @@ if __name__=="__main__":
         # TODO: possibly give previous rvec and tvec as initial guesses
         #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
         #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
-        row_of_ones = np.ones_like(known_3d[:,0])[np.newaxis,:]
-        known_3d_in_previous_frame = (pose @ np.concatenate( (known_3d.T, row_of_ones ), axis=0)).T[:,0:3]
-        print(np.shape(known_3d_in_previous_frame))
+        #row_of_ones = np.ones_like(known_3d[:,0])[np.newaxis,:] # to make homogeneous
+        #known_3d_in_previous_frame = (pose @ np.concatenate( (known_3d.T, row_of_ones ), axis=0)).T[:,0:3]
+        #print("known_3d_in_previous_frame")
+        #print(np.shape(known_3d_in_previous_frame))
+        #print(known_3d_in_previous_frame[:10])
         #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
+        W_T_prev = local_map.GetFrame(id_frame_local-1).GetPose()
+        prev_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix()
+        rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
+        tvec_guess = W_T_prev[0:3,3]
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D, rvec=rvec_guess, tvec=tvec_guess)
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
-        RelativePoseTransformation = Isometry3d(R=r, t=t).inverse().matrix()
-        pose = RelativePoseTransformation @ pose
+        W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame
+        RelativePoseTransformation = prev_T_W @ W_T_curr
         # Add edges
         print("local frame id", id_frame_local)
         local_map.GetFrame(frame_id=id_frame_local-1).AddChild(child_frame=cur_frame) # Add cur frame as child to previous frame
         cur_frame.AddParent(parent_frame_id=local_map.GetFrame(frame_id=id_frame_local-1).GetID(), transition=RelativePoseTransformation) # Add parent as previous frame ID : relative pose transformation key-value pair
-        cur_frame.AddPose(init_pose=pose) # Add pose calculated to the current frame
+        cur_frame.AddPose(init_pose=W_T_curr) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
-        # Do motion only bundle adjustement with local map
+        # TODO: Do motion only bundle adjustement with local map
         localBA = BundleAdjustment(camera)
-        localBA.motionOnlyBundleAdjustement(local_map, scale=True)
+        localBA.motionOnlyBundleAdjustement(local_map, scale=False)
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(1)
+        # increment local frame id
         id_frame_local = id_frame_local + 1
 
     local_map.visualize_map(viewer=viewer2)
 
     viewer2.stop()
-    print("Ruljhati")
+    print("End of run")
     loop_idx = i
     
     

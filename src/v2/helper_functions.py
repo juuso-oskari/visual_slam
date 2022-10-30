@@ -272,3 +272,7 @@ def transformMatrix(rvec, tvec):
         Rt = np.hstack((R, t))
         T = np.vstack((Rt, np.matrix([0, 0, 0, 1])))
         return T
+
+def Rtorvec(R):
+    r, _ = cv2.Rodrigues(R)
+    return r
