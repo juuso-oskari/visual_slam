@@ -16,6 +16,7 @@ from map import Map
 from viewer import Viewer
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
+from copy import deepcopy
 np.set_printoptions(suppress=True)
 
 class Camera:
@@ -146,18 +147,23 @@ if __name__=="__main__":
     camera = Camera(fx,fy,cx,cy)
     BA = BundleAdjustment(camera)
     
-    BA.localBundleAdjustement(map, scale=True)
+    BA.localBundleAdjustement(map, scale=True) # update global map
     # visualize the initialized map
     viewer2 = Viewer()
     map.visualize_map(viewer2)
     
-    # store last keyframe
-    last_keyframe = map.GetFrame(frame_id=id_frame-1)
-    
-    pose22 = last_keyframe.GetPose()
+    # store last keyframe as copy (we do not want to change it during tracking)
+    last_keyframe = deepcopy(map.GetFrame(frame_id=id_frame-1))
     # Start local tracking mapping process
+    # For every new tracking period, create a clean local map
+    # Once a new key frame is detected, update global map
+    local_map = Map()
+    local_map.AddFrame(last_keyframe)
+    local_map.AddPoint3D()
+    
     loop_idx = i
-    for i in range(loop_idx, 1200):
+    for i in range(loop_idx, 150):
+        print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -167,22 +173,20 @@ if __name__=="__main__":
         id_frame = id_frame + 1
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame() # This returns keypoints as numpy.ndarray
         # Get keypoints and features in the last key frame corresponding to known 3D-points
-        kp_prev, features_prev, known_3d = map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
-        print("known3d")
-        print(known_3d[:10])
+        kp_prev, features_prev, known_3d = local_map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
-        print(np.shape(matches))
         # get matched 3d locations
-        known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
-        print("oneliner")
-        print(np.shape(known_3d))
-        #print(type(known_3d))
-        #print(known_3d[:10])
-        # Estimate the camera pose with the Perspective-n-Point algorithm.
-        #temp = np.expand_dims(np.ones_like(known_3d[:,0]), axis=1) # homogeneous
-        temp = np.ones((np.shape(known_3d)[0], 1))
-        known_3d_in_last_keyframe = last_keyframe.GetPose() @ np.concatenate((known_3d, temp), axis=1).T
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d, curMatchedPoints, K, D, useExtrinsicGuess=False)
+        print("cur matches: ", np.shape(matches))
+        #known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
+        known_3d_matched = []
+        for m in matches:
+            known_3d_matched.append(known_3d[m[0].queryIdx])
+        known_3d_matched = np.asarray(known_3d_matched)
+        print("known 3d: ", np.shape(matches)) 
+        # TODO: possibly give previous rvec and tvec as initial guesses
+        #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
+        #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
+        success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_matched, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         pose22 = Isometry3d(R=r, t=t).inverse().matrix()
@@ -190,7 +194,7 @@ if __name__=="__main__":
         viewer2.update_pose(pose = g2o.Isometry3d(pose22), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
 
     viewer2.stop()
     print("Ruljhati")

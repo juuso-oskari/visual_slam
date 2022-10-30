@@ -36,6 +36,16 @@ class Map:
             allpoints.append(point_obj.location_3d)
         return np.array(allpoints).reshape(-1,3)
     
+    
+    def GetCopyOfPointObjects(self, frame_id):
+        image_points = []
+        descriptors = []
+        locations_3d = []
+        for point_obj in self.points_3d.values():
+            # get the known 3d location
+            locations_3d.append(point_obj) 
+        return np.array(image_points), np.array(descriptors), np.array(locations_3d)
+    
     def GetAllPoses(self):
         allposes = []
         for frame_obj in self.frames.values():

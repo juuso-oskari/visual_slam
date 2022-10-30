@@ -64,6 +64,12 @@ class Frame:
         # keyframe flag, determines if the 
         self.keyframe = False
 
+    
+    def __copy__(self):
+        new_frame = Frame()
+        new_frame.rgb = self.rgb
+        new_frame.depth = self.depth
+        #new. = self.keypoints, self.features
 
     # Processes the frame by calling feature_extract method
     def process_frame(self):
@@ -101,3 +107,6 @@ class Frame:
     
     def GetID(self):
         return self.ID
+    
+    def IsKeyFrame(self):
+        return self.keyframe

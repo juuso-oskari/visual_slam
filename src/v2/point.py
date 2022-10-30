@@ -14,6 +14,13 @@ class Point:
     def UpdatePoint(self, new_location):
         self.location_3d = new_location
 
+    # checks if frame with frame_id sees this point
+    def IsVisibleTo(self, frame_id):
+        for frame, uv, descriptor in self.frames:
+            if (frame_id == frame.ID):
+                return True
+        return False
+    
     # Gets image point (2d) based on frame id
     def GetImagePoint(self, frame_id):
         for frame, uv, descriptor in self.frames:

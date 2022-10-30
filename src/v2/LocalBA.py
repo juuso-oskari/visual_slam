@@ -107,6 +107,36 @@ class BundleAdjustment(g2o.SparseOptimizer):
             map.UpdatePoint3D(new_point = self.get_point(point_id)/median_depth, point_id = point_id)
             
         
+    # differs from localBundleAdjustement by setting map points as fixed and estimating motion (poses) only
+    # runs the risk of updating map points and keyframe
+    def motionOnlyBundleAdjustement(self, map, scale=False):
+        frame_ids = map.frames.keys()
+        point_ids = map.points_3d.keys()
+        for frame_id in frame_ids:
+            frame_obj = map.GetFrame(frame_id)
+            if(frame_obj.IsKeyFrame()):
+                self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set key frame as fixed
+            else:
+                self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
+        for point_id in point_ids:
+            point_obj = map.GetPoint(point_id)
+            self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True)
+            for frame, uv, descriptor in point_obj.frames:
+                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
+
+        # run the optimization
+        self.optimize()
+        median_depth = 1
+        if scale:
+            vector_norms = []
+            for point_id in point_ids:
+                vector_norms.append(np.linalg.norm(self.get_point(point_id)))
+            median_depth = np.median(np.array(vector_norms))
         
-                
+        # update local map
+        for frame_id in frame_ids:
+            new_pose = self.get_pose(frame_id).matrix()
+            new_pose[0:3,3] /= median_depth
+            map.UpdatePose(new_pose = new_pose, frame_id = frame_id)
+        
         
