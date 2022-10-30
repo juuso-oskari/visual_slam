@@ -168,7 +168,7 @@ if __name__=="__main__":
     
     loop_idx = i
     init = True
-    for i in range(loop_idx, 150):
+    for i in range(loop_idx, 50):
         print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -188,7 +188,8 @@ if __name__=="__main__":
         row_of_ones = np.ones_like(known_3d[:,0])[np.newaxis,:]
         known_3d_in_previous_frame = (pose @ np.concatenate( (known_3d.T, row_of_ones ), axis=0)).T[:,0:3]
         print(np.shape(known_3d_in_previous_frame))
-        success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
+        #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         RelativePoseTransformation = Isometry3d(R=r, t=t).inverse().matrix()
@@ -199,15 +200,14 @@ if __name__=="__main__":
         cur_frame.AddParent(parent_frame_id=local_map.GetFrame(frame_id=id_frame_local-1).GetID(), transition=RelativePoseTransformation) # Add parent as previous frame ID : relative pose transformation key-value pair
         cur_frame.AddPose(init_pose=pose) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
-        id_frame_local = id_frame_local + 1
         # Do motion only bundle adjustement with local map
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=True)
-        
-        viewer2.update_pose(pose = g2o.Isometry3d(pose), cloud = None, colour=np.array([[0],[0],[0]]).T)
+        viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(1)
+        id_frame_local = id_frame_local + 1
 
     local_map.visualize_map(viewer=viewer2)
 
