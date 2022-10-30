@@ -156,7 +156,6 @@ if __name__=="__main__":
     # Start local tracking mapping process
     # For every new tracking period, create a clean local map, which only updates poses using motionOnlyBundleAdjustement()
     # Once a new key frame is detected, update global map
-    localBA = BundleAdjustment(camera)
     local_map = Map()
     local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
     # start local frame indexing
@@ -201,12 +200,9 @@ if __name__=="__main__":
         cur_frame.AddPose(init_pose=pose) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
         id_frame_local = id_frame_local + 1
-        # Do motion only bundle adjustement with local map (add global map points on first iteration)
-        if init:
-            localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=True)
-            init = False
-        else:
-            localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=False)
+        # Do motion only bundle adjustement with local map
+        localBA = BundleAdjustment(camera)
+        localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=True)
         local_map.visualize_map(viewer=viewer2)
         #viewer2.update_pose(pose = g2o.Isometry3d(pose), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
