@@ -202,14 +202,14 @@ if __name__=="__main__":
         id_frame_local = id_frame_local + 1
         # Do motion only bundle adjustement with local map
         localBA = BundleAdjustment(camera)
-        localBA.motionOnlyBundleAdjustement(local_map, scale=True, init=True)
-        local_map.visualize_map(viewer=viewer2)
-        #viewer2.update_pose(pose = g2o.Isometry3d(pose), cloud = None, colour=np.array([[0],[0],[0]]).T)
+        localBA.motionOnlyBundleAdjustement(local_map, scale=True)
+        
+        viewer2.update_pose(pose = g2o.Isometry3d(pose), cloud = None, colour=np.array([[0],[0],[0]]).T)
         img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imshow('a', img3)
         cv2.waitKey(1)
 
-    
+    local_map.visualize_map(viewer=viewer2)
 
     viewer2.stop()
     print("Ruljhati")
