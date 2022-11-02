@@ -21,14 +21,17 @@ class Map:
         image_points = []
         descriptors = []
         locations_3d = []
+        point_Ids = []
         for point_obj in self.points_3d.values():
             # get image points from tuple
             image_points.append(point_obj.GetImagePoint(frame_id)[0])  
             # get descriptor from tuple
             descriptors.append(point_obj.GetImagePoint(frame_id)[1]) 
             # get the known 3d location
-            locations_3d.append(point_obj.Get3dPoint()) 
-        return np.array(image_points), np.array(descriptors), np.array(locations_3d)
+            locations_3d.append(point_obj.Get3dPoint())
+            # get point ID
+            point_Ids.append(point_obj.GetID()) 
+        return np.array(image_points), np.array(descriptors), np.array(locations_3d), np.array(point_Ids)
     
     
     def GetAll3DPoints(self):
@@ -43,7 +46,10 @@ class Map:
         for point_key in self.points_3d.keys():
             point_obj = self.points_3d[point_key]
             if point_obj.IsVisibleTo(frame_id):
-                points[point_key] = deepcopy(point_obj)
+                point_copy = deepcopy(point_obj)
+                point_copy.frames = point_copy.SubsetOfFrames(frame_id) # overwrite leaving out only subset of frames where frame id is frame_id
+                points[point_key] = point_copy
+                
         return points
     
     def GetAllPoses(self):

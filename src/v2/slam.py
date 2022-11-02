@@ -147,6 +147,9 @@ if __name__=="__main__":
     BA = BundleAdjustment(camera)
     
     BA.localBundleAdjustement(map, scale=True) # update global map
+    
+    BA.save_to_file("gloory.g2o")
+    
     # visualize the initialized map
     viewer2 = Viewer()
     map.visualize_map(viewer2)
@@ -167,7 +170,7 @@ if __name__=="__main__":
     pose = last_keyframe.GetPose()
     
     loop_idx = i # continue where map initialization left off
-    for i in range(loop_idx, 50):
+    for i in range(loop_idx, 100):
         print("Image index: ", i)
         
         # features are extracted for each new frame
@@ -178,24 +181,41 @@ if __name__=="__main__":
         cur_frame = Frame(fp_rgb, fp_depth, id=id_frame_local)
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame(feature_extractor=feature_extractor) # This returns keypoints as numpy.ndarray
         # Get keypoints and features in the last key frame corresponding to known 3D-points
-        kp_prev, features_prev, known_3d = local_map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
+        kp_prev, features_prev, known_3d, point_IDs = local_map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
         # get matched 3d locations
         known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
+        
+        # Add point to frame connection for the new frame in each local map point
+        for m,uv,desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
+            point3D_idx = m[0].queryIdx # get idx of matched point in the last key frame and use that to get the corresponding point_ID in the local map
+            local_map.GetPoint(point_IDs[point3D_idx]).AddFrame(cur_frame, uv, desc)
+        
+        
+        
+        
         # TODO: possibly give previous rvec and tvec as initial guesses
         #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
         #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
         #row_of_ones = np.ones_like(known_3d[:,0])[np.newaxis,:] # to make homogeneous
         #known_3d_in_previous_frame = (pose @ np.concatenate( (known_3d.T, row_of_ones ), axis=0)).T[:,0:3]
-        #print("known_3d_in_previous_frame")
-        #print(np.shape(known_3d_in_previous_frame))
-        #print(known_3d_in_previous_frame[:10])
         #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_in_previous_frame, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
         W_T_prev = local_map.GetFrame(id_frame_local-1).GetPose()
         prev_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix()
         rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
         tvec_guess = W_T_prev[0:3,3]
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D, rvec=rvec_guess, tvec=tvec_guess)
+        
+        known_3d = known_3d[:,np.newaxis,:]
+        print("known 3d shape")
+        print(np.shape(known_3d))
+        curMatchedPoints = curMatchedPoints[:,np.newaxis,:]
+        print("imagepoints shape")
+        print(np.shape(curMatchedPoints))
+        
+        
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=np.array([]))#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
+        #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
+        
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame

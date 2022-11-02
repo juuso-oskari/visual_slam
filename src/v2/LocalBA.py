@@ -34,6 +34,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
         super().set_verbose(verbose)
         super().optimize(max_iterations)
         
+    def save_to_file(self, filename):
+        super().save(filename)
 
     def add_pose(self, pose_id, pose, fixed=False):
         se3 = g2o.SE3Quat(pose[0:3,0:3], pose[0:3,3])
@@ -140,6 +142,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
             frame_obj = map.GetFrame(frame_id)
+            #print("Adding pose: ")
+            #print(frame_obj.GetID())
             if(frame_obj.IsKeyFrame()):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set key frame as fixed
             else:
@@ -151,6 +155,9 @@ class BundleAdjustment(g2o.SparseOptimizer):
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # add all global map points as fixed as this is motion only
             for frame, uv, descriptor in point_obj.frames:
+                #print("Adding edge from", point_obj.GetID())
+                #print("To: ")
+                #print(frame.GetID())
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
 
         # run the optimization

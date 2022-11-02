@@ -4,9 +4,20 @@ import cv2
 class Point:
     def __init__(self, location, id):
         self.ID = id
-        self.frames = [] # list of tuples. (frame, uv). Where uv is the 2d location on the image plane of the frame
+        self.frames = [] # list of triples. (frame, uv, descriptor). Where uv is the 2d location on the image plane of the frame, and descriptor is e.g SIFT feature
         self.location_3d = location
 
+    def GetID(self):
+        return self.ID
+
+    
+    def SubsetOfFrames(self, frame_id):
+        subset = []
+        for frame,uv,desc in self.frames:
+            if frame.GetID() == frame_id:
+                subset.append((frame, uv, desc)) # TODO: possibly a copy needed
+        return subset
+    
     def AddFrame(self, frame, uv, descriptor):
         self.frames.append((frame, uv, descriptor))
 
