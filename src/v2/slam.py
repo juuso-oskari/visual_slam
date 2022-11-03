@@ -58,7 +58,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -170,7 +170,9 @@ if __name__=="__main__":
     pose = last_keyframe.GetPose()
     
     loop_idx = i # continue where map initialization left off
-    for i in range(loop_idx, 100):
+    for i in range(loop_idx, 75):
+        
+
         print("Image index: ", i)
         
         # features are extracted for each new frame
@@ -187,13 +189,10 @@ if __name__=="__main__":
         known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
         
         # Add point to frame connection for the new frame in each local map point
-        for m,uv,desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
+        for m, uv, desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
             point3D_idx = m[0].queryIdx # get idx of matched point in the last key frame and use that to get the corresponding point_ID in the local map
             local_map.GetPoint(point_IDs[point3D_idx]).AddFrame(cur_frame, uv, desc)
-        
-        
-        
-        
+    
         # TODO: possibly give previous rvec and tvec as initial guesses
         #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
         #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
@@ -206,13 +205,7 @@ if __name__=="__main__":
         tvec_guess = W_T_prev[0:3,3]
         
         known_3d = known_3d[:,np.newaxis,:]
-        print("known 3d shape")
-        print(np.shape(known_3d))
-        curMatchedPoints = curMatchedPoints[:,np.newaxis,:]
-        print("imagepoints shape")
-        print(np.shape(curMatchedPoints))
-        
-        
+    
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=np.array([]))#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
         #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
         
@@ -221,18 +214,21 @@ if __name__=="__main__":
         W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame
         RelativePoseTransformation = prev_T_W @ W_T_curr
         # Add edges
-        print("local frame id", id_frame_local)
+
         local_map.GetFrame(frame_id=id_frame_local-1).AddChild(child_frame=cur_frame) # Add cur frame as child to previous frame
         cur_frame.AddParent(parent_frame_id=local_map.GetFrame(frame_id=id_frame_local-1).GetID(), transition=RelativePoseTransformation) # Add parent as previous frame ID : relative pose transformation key-value pair
         cur_frame.AddPose(init_pose=W_T_curr) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
         # TODO: Do motion only bundle adjustement with local map
+        print(cur_frame.GetPose())
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=False)
+        print(cur_frame.GetPose())
+
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
-        img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imshow('a', img3)
-        cv2.waitKey(1)
+        #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        #cv2.imshow('a', img3)
+        #cv2.waitKey(1)
         # increment local frame id
         id_frame_local = id_frame_local + 1
 
