@@ -4,3 +4,4 @@ data/rgbd_dataset_freiburg2_xyz
 data/
 src/testing.ipynb
 __pycache__
+*.g2o

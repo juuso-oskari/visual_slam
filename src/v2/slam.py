@@ -171,7 +171,8 @@ if __name__=="__main__":
     print("last keyframe idx", i)
     
     
-    for i in range(loop_idx+1, 29):
+
+    for i in range(loop_idx+1, 35):
         print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -186,6 +187,7 @@ if __name__=="__main__":
         # get 3d locations of feature points matched in the new frame
         known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
         
+        known_3d_ids = np.array([point_IDs[m[0].queryIdx] for m in matches])
         # TODO: possibly give previous rvec and tvec as initial guesses
         #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
         #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
@@ -196,9 +198,9 @@ if __name__=="__main__":
         prev_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix()
         rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
         tvec_guess = W_T_prev[0:3,3]
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
-                                                        # rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
-        #tvec = tvec[:,np.newaxis]
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]),
+                                                         rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
+        tvec = tvec[:,np.newaxis]
         
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
