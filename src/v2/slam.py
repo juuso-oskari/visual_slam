@@ -17,6 +17,7 @@ from viewer import Viewer
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from copy import deepcopy
+import graphslam
 np.set_printoptions(suppress=True)
 
 class Camera:
@@ -147,9 +148,6 @@ if __name__=="__main__":
     BA = BundleAdjustment(camera)
     
     BA.localBundleAdjustement(map, scale=True) # update global map
-    
-    BA.save_to_file("gloory.g2o")
-    
     # visualize the initialized map
     viewer2 = Viewer()
     map.visualize_map(viewer2)
@@ -170,11 +168,11 @@ if __name__=="__main__":
     pose = last_keyframe.GetPose()
     
     loop_idx = i # continue where map initialization left off
-    for i in range(loop_idx, 75):
-        
-
+    print("last keyframe idx", i)
+    
+    
+    for i in range(loop_idx+1, 150):
         print("Image index: ", i)
-        
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
         # that have known corresponding 3-D map points. 
@@ -185,14 +183,9 @@ if __name__=="__main__":
         # Get keypoints and features in the last key frame corresponding to known 3D-points
         kp_prev, features_prev, known_3d, point_IDs = local_map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
-        # get matched 3d locations
+        # get 3d locations of feature points matched in the new frame
         known_3d = np.array([known_3d[m[0].queryIdx] for m in matches])
         
-        # Add point to frame connection for the new frame in each local map point
-        for m, uv, desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
-            point3D_idx = m[0].queryIdx # get idx of matched point in the last key frame and use that to get the corresponding point_ID in the local map
-            local_map.GetPoint(point_IDs[point3D_idx]).AddFrame(cur_frame, uv, desc)
-    
         # TODO: possibly give previous rvec and tvec as initial guesses
         #retval, rvec, tvec, inliers = cv2.solvePnPRansac(known_3d_matched, curMatchedPoints, K, D, confidence=0.95, iterationsCount=10000, reprojectionError=3) #, confidence=0.999, reprojectionError=3.0/K[0,0])
         #success, rotation_vector, translation_vector = cv2.solvePnP(points_3D, points_2D, camera_matrix, dist_coeffs, flags=0)
@@ -203,28 +196,55 @@ if __name__=="__main__":
         prev_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix()
         rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
         tvec_guess = W_T_prev[0:3,3]
-        
-        known_3d = known_3d[:,np.newaxis,:]
-    
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=np.array([]))#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
-        #success, rvec, tvec = cv2.solvePnP(objectPoints=known_3d, imagePoints=curMatchedPoints, cameraMatrix=K, distCoeffs=D)
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
+                                                        # rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
+        #tvec = tvec[:,np.newaxis]
         
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame
         RelativePoseTransformation = prev_T_W @ W_T_curr
-        # Add edges
-
+        # Check if current frame is a key frame:
+        # 1. at least 20 frames has passed or current frame tracks less than 80 map points
+        # 2. The map points tracked are fewer than 90% of the map points seen by the last key frame
+        """
+        if id_frame_local - id_frame > 20 or np.shape(inliers)[0] < 80 or np.shape(inliers)[0] < 0.9*np.shape(known_3d)[0]:
+            print("New keyframe at idx: ", i)
+            print("Updating global map...")
+            map.GetFrame(frame_id=id_frame-1).AddChild(child_frame=cur_frame) # Add cur frame as child to previous keyframe
+            # Calculate relative pose transformation from last keyframe to current keyframe
+            W_T_prevkey = local_map.GetFrame(id_frame-1).GetPose() # from world to last keyframe
+            prevkey_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix() # from lastkeyframe to world
+            W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame
+            RelativePoseTransformation = prev_T_W @ W_T_curr # Relative pose transform (form last keyframe to current frame = from last keyframe to world and from world to current frame)
+            cur_frame.AddParent(parent_frame_id=map.GetFrame(frame_id=id_frame-1).GetID(), transition=RelativePoseTransformation) # Add parent as previous frame ID : relative pose transformation key-value pair
+            cur_frame.AddPose(init_pose=W_T_curr) # Add pose calculated to the current frame
+            map.AddFrame(frame_id=id_frame, frame=cur_frame) # Add current frame to the global map
+            # Add point to frame connection for the new frame in each map point
+            for m,uv,desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
+                point3D_idx = m[0].queryIdx # get idx of matched point in the last key frame and use that to get the corresponding point_ID in the local map
+                map.GetPoint(point_IDs[point3D_idx]).AddFrame(cur_frame, uv, desc)
+            
+            print("Doing BundleAdjustement...")
+            id_frame = id_frame + 1
+            break # change to continue
+        """
+        # Else continue tracking by adding to local map
+        print("local frame id", id_frame_local)
         local_map.GetFrame(frame_id=id_frame_local-1).AddChild(child_frame=cur_frame) # Add cur frame as child to previous frame
         cur_frame.AddParent(parent_frame_id=local_map.GetFrame(frame_id=id_frame_local-1).GetID(), transition=RelativePoseTransformation) # Add parent as previous frame ID : relative pose transformation key-value pair
         cur_frame.AddPose(init_pose=W_T_curr) # Add pose calculated to the current frame
         local_map.AddFrame(frame_id=id_frame_local, frame=cur_frame) # Add current frame to the map
+        # Add point to frame connection for the new frame in each local map point
+        for m,uv,desc  in zip(matches, curMatchedPoints, curMatchedFeatures):
+            point3D_idx = m[0].queryIdx # get idx of matched point in the last key frame and use that to get the corresponding point_ID in the local map
+            local_map.GetPoint(point_IDs[point3D_idx]).AddFrame(cur_frame, uv, desc)
+        
+        
         # TODO: Do motion only bundle adjustement with local map
         print(cur_frame.GetPose())
         localBA = BundleAdjustment(camera)
-        localBA.motionOnlyBundleAdjustement(local_map, scale=False)
-        print(cur_frame.GetPose())
-
+        localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
         #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         #cv2.imshow('a', img3)
