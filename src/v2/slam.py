@@ -59,7 +59,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -171,6 +171,7 @@ if __name__=="__main__":
     print("last keyframe idx", i)
     
     
+
     for i in range(loop_idx+1, 35):
         print("Image index: ", i)
         # features are extracted for each new frame
@@ -243,12 +244,18 @@ if __name__=="__main__":
         
         
         # TODO: Do motion only bundle adjustement with local map
+        print("Before opt")
+        print(cur_frame.GetPose())
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
-        img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        cv2.imshow('a', img3)
-        cv2.waitKey(1)
+        print("after opt")
+
+        print(cur_frame.GetPose())
+
+        #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        #cv2.imshow('a', img3)
+        #cv2.waitKey(1)
         # increment local frame id
         id_frame_local = id_frame_local + 1
 

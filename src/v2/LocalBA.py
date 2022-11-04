@@ -26,6 +26,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
         # TODO: understand how to get focal length from x y
         f = (camera.fx + camera.fy) / 2.0
         cam = g2o.CameraParameters(f, (camera.cx, camera.cy), 0)
+        #cam = g2o.CameraParameters(1.0, (0.0,0.0), 0)
         cam.set_id(0)
         
         self.focal_length = (camera.fx, camera.fy)
@@ -163,8 +164,6 @@ class BundleAdjustment(g2o.SparseOptimizer):
         point_ids = map.points_3d.keys()
         for frame_id in frame_ids:
             frame_obj = map.GetFrame(frame_id)
-            #print("Adding pose: ")
-            #print(frame_obj.GetID())
             if(frame_obj.IsKeyFrame()):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set key frame as fixed
             else:
@@ -182,13 +181,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv, edge_id=point_id*frame.GetID()+10000)
 
         # run the optimization
-        if save:
-            self.save_to_file("before_opt.g2o")
         self.optimize()
-    
-        if save:
-            self.save_to_file("after_opt.g2o")
-        
         median_depth = 1
         if scale:
             vector_norms = []
@@ -201,5 +194,6 @@ class BundleAdjustment(g2o.SparseOptimizer):
             new_pose = self.get_pose(frame_id).matrix()
             new_pose[0:3,3] /= median_depth
             map.UpdatePose(new_pose = new_pose, frame_id = frame_id)
-        
+
+
         

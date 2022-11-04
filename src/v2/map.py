@@ -94,3 +94,22 @@ class Map:
     # Merge new dictionary of points into 3d map points
     def Store3DPoints(self, points_dict):
         self.points_3d = {**self.points_3d, **points_dict}
+
+    def AddParentAndPose(self, parent_id, frame_id, frame_obj, rel_pose_trans, pose):
+        frame_obj.AddParent(parent_frame_id = parent_id, transition = rel_pose_trans)
+        frame_obj.AddPose(init_pose = pose)
+        self.AddFrame(frame_id=frame_id, frame=frame_obj)
+
+    def AddPointToFrameCorrespondences(self, point_ids, image_points, descriptors, frame_obj):
+        for point_id, uv, desc  in zip(point_ids, image_points, descriptors):
+            self.GetPoint(point_id).AddFrame(frame_obj, uv, desc)
+
+    def DiscardOutlierMapPoints(self, n_visible_frames = 3):
+        for point_id in self.points_3d.keys():
+            point_obj = self.points_3d[point_id]
+            if (point_obj.GetNVisible()<n_visible_frames):
+                self.points_3d.pop(point_id)
+        
+
+        
+

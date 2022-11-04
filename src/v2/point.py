@@ -43,3 +43,6 @@ class Point:
     
     def GetVectorNorm(self):
         return np.linalg.norm(self.location_3d)
+
+    def GetNVisibleFrames(self):
+        return len(self.frames)
