@@ -171,7 +171,7 @@ if __name__=="__main__":
     print("last keyframe idx", i)
     
     
-    for i in range(loop_idx+1, 150):
+    for i in range(loop_idx+1, 29):
         print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -242,10 +242,15 @@ if __name__=="__main__":
         
         
         # TODO: Do motion only bundle adjustement with local map
+        print("Before opt")
         print(cur_frame.GetPose())
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
+        print("after opt")
+
+        print(cur_frame.GetPose())
+
         #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         #cv2.imshow('a', img3)
         #cv2.waitKey(1)

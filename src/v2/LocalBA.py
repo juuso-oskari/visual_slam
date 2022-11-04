@@ -178,7 +178,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 #print("Adding edge from", point_obj.GetID())
                 #print("To: ")
                 #print(frame.GetID())
-                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv)
+                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv, edge_id=point_id*frame.GetID()+10000)
 
         # run the optimization
         self.optimize()
