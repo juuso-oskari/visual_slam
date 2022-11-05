@@ -98,6 +98,7 @@ class Map:
     def AddParentAndPose(self, parent_id, frame_id, frame_obj, rel_pose_trans, pose):
         frame_obj.AddParent(parent_frame_id = parent_id, transition = rel_pose_trans)
         frame_obj.AddPose(init_pose = pose)
+        frame_obj.AddID(frame_id)
         self.AddFrame(frame_id=frame_id, frame=frame_obj)
 
     def AddPointToFrameCorrespondences(self, point_ids, image_points, descriptors, frame_obj):
