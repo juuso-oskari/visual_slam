@@ -46,3 +46,4 @@ class Point:
 
     def GetNVisibleFrames(self):
         return len(self.frames)
+        
