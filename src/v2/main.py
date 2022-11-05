@@ -128,6 +128,11 @@ if __name__=="__main__":
         
         for pt, uv1, uv2, ft1, ft2 in zip(pts_objs, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures):
             pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
+            print(pt)
+            print(type(uv1))
+            print(np.shape(uv1))
+
+            print(uv1)
             pt_object.AddFrame(frame=prev_frame, uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
             pt_object.AddFrame(frame=cur_frame, uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
             map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
@@ -237,42 +242,58 @@ if __name__=="__main__":
             desc1 = desc1[idx]
             matches,  last_keyframe_points, last_keyframe_features, cur_keyframe_points, cur_keyframe_features = feature_matcher.match_features(kp1 = kp1, 
                                                                                     desc1= desc1, kp2 = map.GetFrame(id_frame).GetKeyPoints(), desc2 = map.GetFrame(id_frame).GetFeatures())
-            print(np.shape(matches))
             # TODO: Triagulate matches and add those to map 
-            print("previous ")
-            print(last_keyframe_points)
-            print("cur frame")
-            print(cur_keyframe_points)
-                       
-            new_triagulated_points = triangulate(pose1 = map.GetFrame(id_frame-1).GetPose(), pose2 = map.GetFrame(id_frame).GetPose(), pts1 = last_keyframe_points, pts2 = cur_keyframe_points)
-            
-            ip1 = Isometry3d(R=map.GetFrame(id_frame-1).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame-1).GetPose()[:3, -1]).squeeze()).matrix()
-            ip2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).matrix()
-            P1 = CameraProjectionMatrix(R = ip1[0:3, 0:3], t = ip1[:3, 3:], K = K)
-            P2 = CameraProjectionMatrix(R = ip2[0:3, 0:3], t = ip2[:3, 3:], K = K)
+            p1 = Isometry3d(R=map.GetFrame(id_frame-1).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame-1).GetPose()[:3, -1]).squeeze()).matrix()
+            p2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).matrix()
+            P1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
+            P2 = CameraProjectionMatrix(R = p2[0:3, 0:3], t = p2[:3, 3:], K = K)
             x1 = MakeHomogeneous(last_keyframe_points)
             x2 = MakeHomogeneous(cur_keyframe_points)
-            #new_triagulated_points = triangulate_points(P1, P2, x1, x2)
             new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
             new_triagulated_points /= -new_triagulated_points[:,3:]
-            #new_triagulated_points = cv2.triangulatePoints(P1, P2, x1[:,:2].T, x2[:,:2].T)
-            #new_triagulated_points /= -new_triagulated_points[3]
-            #new_triagulated_points = (new_triagulated_points[:3]).T
             
-            print(known_3d[0:10])
-            print("new_triagulated_points")
-            print(new_triagulated_points)
+            
+            proj1 = p1 @ new_triagulated_points.T
+            proj2 = p2 @ new_triagulated_points.T
+            
+            new_triagulated_points = new_triagulated_points[:,:3]
+            
+            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) )
+            
+            print(np.shape(new_triagulated_points[good_points_idx]))
+            print(np.shape(new_triagulated_points))
+            
+            for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_points[good_points_idx], cur_keyframe_features[good_points_idx]):
+                pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
+                pt_object.AddFrame(frame=map.GetFrame(id_frame-1), uv=uv1[:,np.newaxis].astype(np.float64), descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
+                pt_object.AddFrame(frame=map.GetFrame(id_frame), uv=uv2[:,np.newaxis].astype(np.float64), descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
+                map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
+                id_point = id_point + 1  # Increment point id
+            
+            
             # TODO: Bundle adjustement
-            viewer2.update_pose(pose = g2o.Isometry3d(W_T_cur_key), cloud = new_triagulated_points[:,:3], colour=np.array([[0],[0],[0]]).T)
-            img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp1), map.GetFrame(id_frame).rgb, Numpy2Keypoint(map.GetFrame(id_frame).GetKeyPoints()),matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-            cv2.imshow('a', img3)
-            cv2.waitKey(0)
-            break
+            BA = BundleAdjustment(camera)
+            BA.localBundleAdjustement(map)
+            
+            # Increment ińdices and store as last keyframe
+            id_frame = id_frame + 1
+            # store last keyframe as copy (we do not want to change it during tracking)
+            last_keyframe = deepcopy(map.GetFrame(frame_id=id_frame-1))
+            # Start local tracking mapping process
+            # For every new tracking period, create a clean local map, which only updates poses using motionOnlyBundleAdjustement()
+            # Once a new key frame is detected, update global map
+            local_map = Map()
+            local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
+            # start local frame indexing
+            print("last keyframe id: ", last_keyframe.GetID())
+            id_frame_local = id_frame
+            # add to local map the points from global map, which the last keyframe sees
+            local_map.Store3DPoints(map.GetCopyOfPointObjects(last_keyframe.GetID()))
 
 
         id_frame_local = id_frame_local + 1
 
-    local_map.visualize_map(viewer=viewer2)
+    map.visualize_map(viewer=viewer2)
 
     viewer2.stop()
     print("End of run")
