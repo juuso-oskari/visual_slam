@@ -59,7 +59,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -220,9 +220,9 @@ if __name__=="__main__":
         if (i-loop_idx > 20 or len(curMatchedPoints) < 80) and (len(curMatchedPoints) < 0.9*len(known_3d)):
             loop_idx = i
             cur_frame.SetAsKeyFrame()
-            W_T_prev_key = map.GetFrame(id_frame-1).GetPose()
+            W_T_prev_key = map.GetFrame(id_frame-1).GetPose() # Get last keyframe pose from global map
             prev_key_T_W = Isometry3d(R=W_T_prev_key[0:3,0:3], t=np.asarray(W_T_prev_key[:3, -1]).squeeze()).inverse().matrix()
-            W_T_cur_key = W_T_curr
+            W_T_cur_key = local_map.GetFrame(id_frame_local).GetPose() # get optimized pose from local map
             # Update global map by adding new keyframe 
             map.AddParentAndPose(parent_id = id_frame-1, frame_id = id_frame, frame_obj = cur_frame, rel_pose_trans = prev_key_T_W @ W_T_cur_key, pose = W_T_cur_key)
             # Add Point frame correspondance
@@ -231,30 +231,42 @@ if __name__=="__main__":
             #map.DiscardOutlierMapPoints(n_visible_frames=3)
             # TODO: Feature mathing between frames frame_id-1 and frame_id with unmatched points ie not with points that are already in the map
             kp1 = map.GetFrame(id_frame-1).GetKeyPoints()
-            print("ennen")
-            print(np.shape(kp1))
             desc1 = map.GetFrame(id_frame-1).GetFeatures()
             idx = GetListDiff(kp1, kp_prev)
-            print("idx")
-            print(idx)
             kp1 = kp1[idx]
             desc1 = desc1[idx]
-            print("Jälkeen")
-            print(np.shape(kp1))
             matches,  last_keyframe_points, last_keyframe_features, cur_keyframe_points, cur_keyframe_features = feature_matcher.match_features(kp1 = kp1, 
                                                                                     desc1= desc1, kp2 = map.GetFrame(id_frame).GetKeyPoints(), desc2 = map.GetFrame(id_frame).GetFeatures())
             print(np.shape(matches))
-            img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(last_keyframe_points), map.GetFrame(id_frame).rgb, Numpy2Keypoint(cur_keyframe_points), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-            cv2.imshow('a', img3)
-            cv2.waitKey(0)
-            # TODO: Triagulate matches and add those to map
+            # TODO: Triagulate matches and add those to map 
+            print("previous ")
+            print(last_keyframe_points)
+            print("cur frame")
+            print(cur_keyframe_points)
+                       
             new_triagulated_points = triangulate(pose1 = map.GetFrame(id_frame-1).GetPose(), pose2 = map.GetFrame(id_frame).GetPose(), pts1 = last_keyframe_points, pts2 = cur_keyframe_points)
-            #new_triagulated_points /= np.expand_dims(new_triagulated_points[:,3], axis=1)
-            print("old_triagulated_points")
+            
+            ip1 = Isometry3d(R=map.GetFrame(id_frame-1).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame-1).GetPose()[:3, -1]).squeeze()).matrix()
+            ip2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).matrix()
+            P1 = CameraProjectionMatrix(R = ip1[0:3, 0:3], t = ip1[:3, 3:], K = K)
+            P2 = CameraProjectionMatrix(R = ip2[0:3, 0:3], t = ip2[:3, 3:], K = K)
+            x1 = MakeHomogeneous(last_keyframe_points)
+            x2 = MakeHomogeneous(cur_keyframe_points)
+            #new_triagulated_points = triangulate_points(P1, P2, x1, x2)
+            new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
+            new_triagulated_points /= -new_triagulated_points[:,3:]
+            #new_triagulated_points = cv2.triangulatePoints(P1, P2, x1[:,:2].T, x2[:,:2].T)
+            #new_triagulated_points /= -new_triagulated_points[3]
+            #new_triagulated_points = (new_triagulated_points[:3]).T
+            
             print(known_3d[0:10])
             print("new_triagulated_points")
-            print(new_triagulated_points[0:10])
+            print(new_triagulated_points)
             # TODO: Bundle adjustement
+            viewer2.update_pose(pose = g2o.Isometry3d(W_T_cur_key), cloud = new_triagulated_points[:,:3], colour=np.array([[0],[0],[0]]).T)
+            img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp1), map.GetFrame(id_frame).rgb, Numpy2Keypoint(map.GetFrame(id_frame).GetKeyPoints()),matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            cv2.imshow('a', img3)
+            cv2.waitKey(0)
             break
 
 
