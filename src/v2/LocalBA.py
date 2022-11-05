@@ -147,7 +147,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
             for point_id in point_ids:
                 vector_norms.append(np.linalg.norm(self.get_point(point_id)))
             median_depth = np.median(np.array(vector_norms))
-        
+        print("median")
+        print(median_depth)
         # update map
         for frame_id in frame_ids:
             new_pose = self.get_pose(frame_id).matrix()
@@ -188,7 +189,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
             for point_id in point_ids:
                 vector_norms.append(np.linalg.norm(self.get_point(point_id)))
             median_depth = np.median(np.array(vector_norms))
-        
+
         # update local map
         for frame_id in frame_ids:
             new_pose = self.get_pose(frame_id).matrix()

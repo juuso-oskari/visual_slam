@@ -105,9 +105,10 @@ class Map:
             self.GetPoint(point_id).AddFrame(frame_obj, uv, desc)
 
     def DiscardOutlierMapPoints(self, n_visible_frames = 3):
-        for point_id in self.points_3d.keys():
+        keys = self.points_3d.keys()
+        for point_id in keys:
             point_obj = self.points_3d[point_id]
-            if (point_obj.GetNVisible()<n_visible_frames):
+            if (point_obj.GetNVisibleFrames()<n_visible_frames):
                 self.points_3d.pop(point_id)
         
 

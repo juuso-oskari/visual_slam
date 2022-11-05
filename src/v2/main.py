@@ -225,8 +225,37 @@ if __name__=="__main__":
             W_T_cur_key = W_T_curr
             # Update global map by adding new keyframe 
             map.AddParentAndPose(parent_id = id_frame-1, frame_id = id_frame, frame_obj = cur_frame, rel_pose_trans = prev_key_T_W @ W_T_cur_key, pose = W_T_cur_key)
+            # Add Point frame correspondance
             map.AddPointToFrameCorrespondences(point_ids = [point_IDs[m[0].queryIdx] for m in matches], image_points = curMatchedPoints, descriptors = curMatchedFeatures, frame_obj = cur_frame)
-            map.DiscardOutlierMapPoints(n_visible_frames=3)
+            # Remove outlier map points that are observed in fewer than 3 key frames
+            #map.DiscardOutlierMapPoints(n_visible_frames=3)
+            # TODO: Feature mathing between frames frame_id-1 and frame_id with unmatched points ie not with points that are already in the map
+            kp1 = map.GetFrame(id_frame-1).GetKeyPoints()
+            print("ennen")
+            print(np.shape(kp1))
+            desc1 = map.GetFrame(id_frame-1).GetFeatures()
+            idx = GetListDiff(kp1, kp_prev)
+            print("idx")
+            print(idx)
+            kp1 = kp1[idx]
+            desc1 = desc1[idx]
+            print("Jälkeen")
+            print(np.shape(kp1))
+            matches,  last_keyframe_points, last_keyframe_features, cur_keyframe_points, cur_keyframe_features = feature_matcher.match_features(kp1 = kp1, 
+                                                                                    desc1= desc1, kp2 = map.GetFrame(id_frame).GetKeyPoints(), desc2 = map.GetFrame(id_frame).GetFeatures())
+            print(np.shape(matches))
+            img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(last_keyframe_points), map.GetFrame(id_frame).rgb, Numpy2Keypoint(cur_keyframe_points), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+            cv2.imshow('a', img3)
+            cv2.waitKey(0)
+            # TODO: Triagulate matches and add those to map
+            new_triagulated_points = triangulate(pose1 = map.GetFrame(id_frame-1).GetPose(), pose2 = map.GetFrame(id_frame).GetPose(), pts1 = last_keyframe_points, pts2 = cur_keyframe_points)
+            #new_triagulated_points /= np.expand_dims(new_triagulated_points[:,3], axis=1)
+            print("old_triagulated_points")
+            print(known_3d[0:10])
+            print("new_triagulated_points")
+            print(new_triagulated_points[0:10])
+            # TODO: Bundle adjustement
+            break
 
 
         id_frame_local = id_frame_local + 1
