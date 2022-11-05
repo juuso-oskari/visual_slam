@@ -106,6 +106,9 @@ class Frame:
 
     def GetKeyPoints(self):
         return self.keypoints
+
+    def GetFeatures(self):
+        return self.features
     
     def GetID(self):
         return self.ID
