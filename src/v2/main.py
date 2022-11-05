@@ -59,7 +59,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -173,7 +173,7 @@ if __name__=="__main__":
     print("last keyframe idx", i)
     
 
-    for i in range(loop_idx+1, 70):
+    for i in range(loop_idx+1, 500):
         print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -263,10 +263,10 @@ if __name__=="__main__":
             print(np.shape(new_triagulated_points[good_points_idx]))
             print(np.shape(new_triagulated_points))
             
-            for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_points[good_points_idx], cur_keyframe_features[good_points_idx]):
+            for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], cur_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_features[good_points_idx]):
                 pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
-                pt_object.AddFrame(frame=map.GetFrame(id_frame-1), uv=uv1[:,np.newaxis].astype(np.float64), descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
-                pt_object.AddFrame(frame=map.GetFrame(id_frame), uv=uv2[:,np.newaxis].astype(np.float64), descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
+                pt_object.AddFrame(frame=map.GetFrame(id_frame-1), uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
+                pt_object.AddFrame(frame=map.GetFrame(id_frame), uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
                 map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
                 id_point = id_point + 1  # Increment point id
             
@@ -286,7 +286,7 @@ if __name__=="__main__":
             local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
             # start local frame indexing
             print("last keyframe id: ", last_keyframe.GetID())
-            id_frame_local = id_frame
+            id_frame_local = id_frame-1
             # add to local map the points from global map, which the last keyframe sees
             local_map.Store3DPoints(map.GetCopyOfPointObjects(last_keyframe.GetID()))
 

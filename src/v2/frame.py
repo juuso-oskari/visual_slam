@@ -115,3 +115,7 @@ class Frame:
     
     def IsKeyFrame(self):
         return self.keyframe
+    
+    def AddID(self, new_id):
+        self.ID = new_id
+
