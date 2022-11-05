@@ -286,6 +286,9 @@ if __name__=="__main__":
             local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
             # start local frame indexing
             print("last keyframe id: ", last_keyframe.GetID())
+
+
+            ## NOTICE THIS AND THINK
             id_frame_local = id_frame-1
             # add to local map the points from global map, which the last keyframe sees
             local_map.Store3DPoints(map.GetCopyOfPointObjects(last_keyframe.GetID()))
