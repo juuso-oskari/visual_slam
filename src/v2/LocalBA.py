@@ -136,6 +136,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
             for frame, uv, descriptor in point_obj.frames:
+
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv,  edge_id=point_id*frame.GetID()+100000)
         # run the optimization
         self.optimize()
@@ -165,9 +166,9 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set key frame as fixed
             else:
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
-                for parent_ID in frame_obj.GetParentIDs():
+                #for parent_ID in frame_obj.GetParentIDs():
                     # add edge between parent and current frame (usually previous and current frame, with loop closure as exception)
-                    self.add_edge_between_poses(parent_id = parent_ID, child_id = frame_id, measurement=frame_obj.GetTransitionWithParentID(parent_ID))
+                    #self.add_edge_between_poses(parent_id = parent_ID, child_id = frame_id, measurement=frame_obj.GetTransitionWithParentID(parent_ID))
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # add all global map points as fixed as this is motion only
