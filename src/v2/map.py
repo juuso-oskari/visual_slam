@@ -33,7 +33,13 @@ class Map:
             point_Ids.append(point_obj.GetID()) 
         return np.array(image_points), np.array(descriptors), np.array(locations_3d), np.array(point_Ids)
     
-    
+    # Returns 3c locations of points with id on id_list
+    def Get3DPointsWithIDs(self, id_list):
+        points = []
+        for point_id in id_list:
+            points.append(self.points_3d[point_id].location_3d)
+        return np.array(points).reshape(-1,3)
+    # Returns 3d locations of all points in the map
     def GetAll3DPoints(self):
         allpoints = []
         for point_obj in self.points_3d.values():

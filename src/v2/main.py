@@ -235,6 +235,8 @@ if __name__=="__main__":
             matches,  last_keyframe_points, last_keyframe_features, cur_keyframe_points, cur_keyframe_features = feature_matcher.match_features(kp1 = kp1, 
                                                                                     desc1= desc1, kp2 = map.GetFrame(id_frame).GetKeyPoints(), desc2 = map.GetFrame(id_frame).GetFeatures())
             # TODO: Triagulate matches and add those to map 
+            
+            """
             p1 = Isometry3d(R=map.GetFrame(id_frame-1).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame-1).GetPose()[:3, -1]).squeeze()).matrix()
             p2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).matrix()
             P1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
@@ -244,12 +246,28 @@ if __name__=="__main__":
             
             x1 = MakeHomogeneous(last_keyframe_points)
             x2 = MakeHomogeneous(cur_keyframe_points)
-            
-            
-            # TODO: Fix triangulate
-            # Cpp style
-            new_triagulated_points = triangulateCpp(proj1 = P1, proj2 = P2, pts1 = x1, pts2 = x2)
+            """
+           
+            # poses of two keyframes (4x4 matrices) : from World to Camera Frame
+            p1 = map.GetFrame(id_frame-1).GetPose()
+            p2 = map.GetFrame(id_frame).GetPose()
+            # projection matrices (3x4)
+            Proj1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
+            Proj2 = CameraProjectionMatrix(R = p2[0:3, 0:3], t = p2[:3, 3:], K = K)
+            # triangulated points (Nx4) 
+            x1 = MakeHomogeneous(last_keyframe_points) # matched image points in map.GetFrame(id_frame-1)
+            x2 = MakeHomogeneous(cur_keyframe_points) # matched image points in map.GetFrame(id_frame)
+            new_triagulated_points = triangulate_points_course(P1 = Proj1, P2 = Proj2, x1s = x1, x2s = x2)
+            print(np.shape(new_triagulated_points))
+            # Normalizing
             new_triagulated_points /= new_triagulated_points[:,3:]
+            
+            
+            
+            # TODO: Fix triangulate, most likely a scaling issue, since new points are drawn as rays on concecutive updates of viewer (same point different scaling)
+            # Cpp style
+            #new_triagulated_points = triangulateCpp(proj1 = p1, proj2 = p2, pts1 = x1, pts2 = x2)
+            #new_triagulated_points /= new_triagulated_points[:,3:]
             # Geohot style
             #new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
             #new_triagulated_points /= -new_triagulated_points[:,3:]
@@ -260,32 +278,27 @@ if __name__=="__main__":
             
             proj1 = p1 @ new_triagulated_points.T
             proj2 = p2 @ new_triagulated_points.T
-            #print("Matched points")
-            #print(x2[:10])
-            #print("Projected points after triangulation")
-            #project2 = P2 @ new_triagulated_points.T
-            #project2 /= project2[2]
-            #print(project2.T[:10])
             
-            #print(proj2.T)
             
             new_triagulated_points = new_triagulated_points[:,:3]
             # cherilarity check (positive depth when projected)
-            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] < 1.5) & (proj1[2] < 1.5))[0]
-       
-            
+            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] < 1) & (proj1[2] < 10))[0]
+            # just for visualization
+            new_points_ids = []
             for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], cur_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_features[good_points_idx]):
                 pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
                 pt_object.AddFrame(frame=map.GetFrame(id_frame-1), uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
                 pt_object.AddFrame(frame=map.GetFrame(id_frame), uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
                 map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
+                new_points_ids.append(id_point)
                 id_point = id_point + 1  # Increment point id
+                
             
             # TODO: Bundle adjustement
             BA = BundleAdjustment(camera)
             BA.localBundleAdjustement(map)
-            # update viewer
-            viewer2.update_pose(pose = g2o.Isometry3d(map.GetFrame(id_frame).GetPose()), cloud = map.GetAll3DPoints(), colour=np.array([[0],[0],[0]]).T)
+            # update viewer with new pose and new points (both optimized)
+            viewer2.update_pose(pose = g2o.Isometry3d(map.GetFrame(id_frame).GetPose()), cloud = map.Get3DPointsWithIDs(new_points_ids), colour=np.array([[0],[0],[0]]).T)
 
             # Store as last keyframe and increment indices correctly (local tracking starts again at next index)
 

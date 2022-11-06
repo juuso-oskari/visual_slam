@@ -366,6 +366,32 @@ def CameraProjectionMatrix2(Pose, K):
     #return np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 
 
+
+def triangulate_point(P1, P2, x1, x2):
+    ##-your-code-starts-here-##
+    x1x=np.array([[0,-x1[2],x1[1]],
+                  [x1[2],0,-x1[0]],
+                  [-x1[1],x1[0],0]])
+    x2x=np.array([[0,-x2[2],x2[1]],
+                  [x2[2],0,-x2[0]],
+                  [-x2[1],x2[0],0]])
+    A1=np.dot(x1x,P1)
+    A2=np.dot(x2x,P2)
+    A=np.vstack((A1,A2))
+    eigenVaules,eigenVectors=np.linalg.eig(np.dot(A.T,A))
+    idx=np.argsort(eigenVaules)[0]
+    X=eigenVectors[:,idx]
+    ##-your-code-ends-here-##
+    return X
+
+
+def triangulate_points_course(P1, P2, x1s, x2s):
+    points_3D = []
+    for x1,x2 in zip(x1s, x2s):
+        points_3D.append(triangulate_point(P1,P2,x1,x2))
+    return np.squeeze(np.asarray(points_3D))
+
+
 #import numpy as np
 #P = np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 
