@@ -128,11 +128,6 @@ if __name__=="__main__":
         
         for pt, uv1, uv2, ft1, ft2 in zip(pts_objs, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures):
             pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
-            print(pt)
-            print(type(uv1))
-            print(np.shape(uv1))
-
-            print(uv1)
             pt_object.AddFrame(frame=prev_frame, uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
             pt_object.AddFrame(frame=cur_frame, uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
             map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
@@ -257,15 +252,23 @@ if __name__=="__main__":
             #new_triagulated_points /= -new_triagulated_points[:,3:]
             # OpenCV style
             new_triagulated_points = cv2.triangulatePoints(projMatr1=(P1).astype(np.float32), projMatr2=(P2).astype(np.float32), projPoints1=(x1[:,:2].T).astype(np.float32), projPoints2=(x2[:,:2].T).astype(np.float32))
-            new_triagulated_points /= new_triagulated_points[3]
+            new_triagulated_points /= -new_triagulated_points[3]
             new_triagulated_points = new_triagulated_points.T
             
             proj1 = p1 @ new_triagulated_points.T
             proj2 = p2 @ new_triagulated_points.T
+            #print("Matched points")
+            #print(x2[:10])
+            #print("Projected points after triangulation")
+            #project2 = P2 @ new_triagulated_points.T
+            #project2 /= project2[2]
+            #print(project2.T[:10])
+            
+            print(proj2.T)
             
             new_triagulated_points = new_triagulated_points[:,:3]
             # cherilarity check (positive depth when projected)
-            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0))
+            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] > 0) & (proj2[2] < 5))
             
             for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], cur_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_features[good_points_idx]):
                 pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
