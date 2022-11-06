@@ -290,6 +290,28 @@ def triangulate(pose1, pose2, pts1, pts2):
     ret[i] = vt[3]
   return ret
 
+
+def triangulateCpp(proj1, proj2, pts1, pts2):
+  ret = np.zeros((pts1.shape[0], 4))
+  Tcw1 = np.zeros((3,4))
+  Tcw1[0:3,0:3] = proj1[0:3,0:3].T
+  Tcw1[0:3,3:] = proj1[0:3,3]
+  Tcw2 = np.zeros((3,4))
+  Tcw2[0:3,0:3] = proj2[0:3,0:3].T
+  Tcw2[0:3,3:] = proj2[0:3,3]
+  
+  for i, p in enumerate(zip(pts1, pts2)):
+    A = np.zeros((4,4))
+    A[0] = p[0][0] * Tcw1[2] - Tcw1[0]
+    A[1] = p[0][1] * Tcw1[2] - Tcw1[1]
+    A[2] = p[1][0] * Tcw2[2] - Tcw2[0]
+    A[3] = p[1][1] * Tcw2[2] - Tcw2[1]
+    _, _, vt = np.linalg.svd(A)
+    ret[i] = vt[3]
+  return ret
+
+
+
 # Returns indexes that are not in kp2
 def GetListDiff(kp1, kp2):
     #set2 = set(kp2)
