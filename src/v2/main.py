@@ -59,7 +59,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -128,11 +128,6 @@ if __name__=="__main__":
         
         for pt, uv1, uv2, ft1, ft2 in zip(pts_objs, inlierPrePoints, inlierCurrPoints, inlierPreFeatures, inlierCurrFeatures):
             pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
-            print(pt)
-            print(type(uv1))
-            print(np.shape(uv1))
-
-            print(uv1)
             pt_object.AddFrame(frame=prev_frame, uv=uv1, descriptor=ft1) # Add first frame to the point object. This is frame where the point was detected
             pt_object.AddFrame(frame=cur_frame, uv=uv2, descriptor=ft2)# Add second frame to the point object. This is frame where the point was detected
             map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
@@ -214,12 +209,12 @@ if __name__=="__main__":
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
         
+
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
         viewer2.update_image(cv2.resize(cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), None, fx=.6, fy=.6))
 
-        #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        #cv2.imshow('a', img3)
-        #cv2.waitKey(1)
+
+
         # increment local frame id
         # Check if current frame is a key frame:
         # 1. at least 20 frames has passed or current frame tracks less than 80 map points
@@ -249,21 +244,35 @@ if __name__=="__main__":
             p2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).matrix()
             P1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
             P2 = CameraProjectionMatrix(R = p2[0:3, 0:3], t = p2[:3, 3:], K = K)
+            P1 = CameraProjectionMatrix2(map.GetFrame(id_frame-1).GetPose(), K)
+            P2 = CameraProjectionMatrix2(map.GetFrame(id_frame).GetPose(), K)
+            
             x1 = MakeHomogeneous(last_keyframe_points)
             x2 = MakeHomogeneous(cur_keyframe_points)
-            new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
-            new_triagulated_points /= -new_triagulated_points[:,3:]
             
+            # TODO: Fix triangulate
+            # Geohot style
+            #new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
+            #new_triagulated_points /= -new_triagulated_points[:,3:]
+            # OpenCV style
+            new_triagulated_points = cv2.triangulatePoints(projMatr1=(P1).astype(np.float32), projMatr2=(P2).astype(np.float32), projPoints1=(x1[:,:2].T).astype(np.float32), projPoints2=(x2[:,:2].T).astype(np.float32))
+            new_triagulated_points /= -new_triagulated_points[3]
+            new_triagulated_points = new_triagulated_points.T
             
             proj1 = p1 @ new_triagulated_points.T
             proj2 = p2 @ new_triagulated_points.T
+            #print("Matched points")
+            #print(x2[:10])
+            #print("Projected points after triangulation")
+            #project2 = P2 @ new_triagulated_points.T
+            #project2 /= project2[2]
+            #print(project2.T[:10])
+            
+            print(proj2.T)
             
             new_triagulated_points = new_triagulated_points[:,:3]
-            
-            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) )
-            
-            print(np.shape(new_triagulated_points[good_points_idx]))
-            print(np.shape(new_triagulated_points))
+            # cherilarity check (positive depth when projected)
+            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] > 0) & (proj2[2] < 5))
             
             for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], cur_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_features[good_points_idx]):
                 pt_object = Point(location=pt, id=id_point) # Create point class with 3d point and point id
@@ -272,34 +281,33 @@ if __name__=="__main__":
                 map.AddPoint3D(point_id=id_point, point_3d=pt_object) # add to map
                 id_point = id_point + 1  # Increment point id
             
-            
             # TODO: Bundle adjustement
             BA = BundleAdjustment(camera)
             BA.localBundleAdjustement(map)
+            # update viewer
+            viewer2.update_pose(pose = g2o.Isometry3d(map.GetFrame(id_frame).GetPose()), cloud = map.GetAll3DPoints(), colour=np.array([[0],[0],[0]]).T)
             
 
-            # TODO: Make new local map
-            # Increment ińdices and store as last keyframe
-            id_frame = id_frame + 1
+            # Store as last keyframe and increment indices correctly (local tracking starts again at next index)
+
             # store last keyframe as copy (we do not want to change it during tracking)
-            last_keyframe = deepcopy(map.GetFrame(frame_id=id_frame-1))
-            # Start local tracking mapping process
-            # For every new tracking period, create a clean local map, which only updates poses using motionOnlyBundleAdjustement()
-            # Once a new key frame is detected, update global map
+            last_keyframe = deepcopy(map.GetFrame(frame_id=id_frame))
+            # Start local tracking mapping process again
+            # For every new tracking period, create a clean local map, which only updates following poses using motionOnlyBundleAdjustement()
             local_map = Map()
             local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
             # start local frame indexing
-            print("last keyframe id inside mapping: ", last_keyframe.GetID())
 
+            print("last keyframe id: ", last_keyframe.GetID())
+            id_frame = id_frame + 1
+            id_frame_local = id_frame
 
-            ## NOTICE THIS AND THINK
-            id_frame_local = id_frame-1
             # add to local map the points from global map, which the last keyframe sees
             local_map.Store3DPoints(map.GetCopyOfPointObjects(last_keyframe.GetID()))
-
-
-        id_frame_local = id_frame_local + 1
-
+        
+        else: # else just continue local tracking
+            id_frame_local = id_frame_local + 1
+           
     #map.visualize_map(viewer=viewer2)
 
     viewer2.stop()

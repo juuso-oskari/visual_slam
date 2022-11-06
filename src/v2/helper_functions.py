@@ -339,6 +339,11 @@ def CameraProjectionMatrix(R, t, K):
     #return np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 
 
+def CameraProjectionMatrix2(Pose, K):
+    return K @ np.concatenate( (np.eye(3), np.zeros((3,1)) ), axis=1) @ Pose
+    #return np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
+
+
 #import numpy as np
 #P = np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 

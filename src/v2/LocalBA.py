@@ -136,19 +136,16 @@ class BundleAdjustment(g2o.SparseOptimizer):
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
             for frame, uv, descriptor in point_obj.frames:
-                #print("Edge from frame", frame.GetID(), "to point", point_id)
+
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv,  edge_id=point_id*frame.GetID()+100000)
         # run the optimization
         self.optimize()
-        print("Men optimizeen")
         median_depth = 1
         if scale:
             vector_norms = []
             for point_id in point_ids:
                 vector_norms.append(np.linalg.norm(self.get_point(point_id)))
             median_depth = np.median(np.array(vector_norms))
-        print("median")
-        print(median_depth)
         # update map
         for frame_id in frame_ids:
             new_pose = self.get_pose(frame_id).matrix()
