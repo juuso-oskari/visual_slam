@@ -173,7 +173,7 @@ if __name__=="__main__":
     print("last keyframe idx", i)
     
 
-    for i in range(loop_idx+1, 500):
+    for i in range(loop_idx+1, 1000):
         print("Image index: ", i)
         # features are extracted for each new frame
         # and then matched (using matchFeatures), with features in the last key frame
@@ -193,15 +193,16 @@ if __name__=="__main__":
         prev_T_W = Isometry3d(R=W_T_prev[0:3,0:3], t=np.asarray(W_T_prev[:3, -1]).squeeze()).inverse().matrix()
         rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
         tvec_guess = W_T_prev[0:3,3]
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]),
-                                                        rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
-        tvec = tvec[:,np.newaxis]
+        print("RÄNSÄCKKI lasketaan N pisteen perusteella", len(known_3d_matched))
+        #retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
+                                                        #rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
+        retval, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
+        #tvec = tvec[:,np.newaxis]
         
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
         W_T_curr = Isometry3d(R=r, t=t).inverse().matrix() # form wold frame to current camera frame
         RelativePoseTransformation = prev_T_W @ W_T_curr
-
 
         # Else continue tracking by adding to local map
         # Add frame to map, add parent, and relative pose between  these two
@@ -212,8 +213,9 @@ if __name__=="__main__":
         # TODO: Do motion only bundle adjustement with local map
         localBA = BundleAdjustment(camera)
         localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
+        
         viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
-
+        viewer2.update_image(cv2.resize(cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), None, fx=.6, fy=.6))
 
         #img3 = cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         #cv2.imshow('a', img3)
@@ -275,6 +277,8 @@ if __name__=="__main__":
             BA = BundleAdjustment(camera)
             BA.localBundleAdjustement(map)
             
+
+            # TODO: Make new local map
             # Increment ińdices and store as last keyframe
             id_frame = id_frame + 1
             # store last keyframe as copy (we do not want to change it during tracking)
@@ -285,7 +289,7 @@ if __name__=="__main__":
             local_map = Map()
             local_map.AddFrame(last_keyframe.GetID(), last_keyframe)
             # start local frame indexing
-            print("last keyframe id: ", last_keyframe.GetID())
+            print("last keyframe id inside mapping: ", last_keyframe.GetID())
 
 
             ## NOTICE THIS AND THINK
@@ -296,7 +300,7 @@ if __name__=="__main__":
 
         id_frame_local = id_frame_local + 1
 
-    map.visualize_map(viewer=viewer2)
+    #map.visualize_map(viewer=viewer2)
 
     viewer2.stop()
     print("End of run")
