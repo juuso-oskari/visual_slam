@@ -142,9 +142,15 @@ class BundleAdjustment(g2o.SparseOptimizer):
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
-
-            for frame, uv, descriptor in point_obj.frames:
-                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv,  edge_id=point_id*frame.GetID()+10000000)
+            # add edge between point and frames that see the point
+            for frame_id in frame_ids:
+                correspondence = point_obj.GetFrame(frame_id)
+                if correspondence != None:
+                    _, uv, _ =  correspondence
+                    self.add_edge(point_id=point_id, pose_id=frame_id, measurement=uv,  edge_id=point_id*frame_id+10000000)
+            
+            #for frame, uv, descriptor in point_obj.frames:
+            #    self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv,  edge_id=point_id*frame.GetID()+10000000)
         # run the optimization
         self.optimize()
         median_depth = 1
@@ -179,11 +185,11 @@ class BundleAdjustment(g2o.SparseOptimizer):
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint(), fixed=True) # add all global map points as fixed as this is motion only
-            for frame, uv, descriptor in point_obj.frames:
-                #print("Adding edge from", point_obj.GetID())
-                #print("To: ")
-                #print(frame.GetID())
-                self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv, edge_id=point_id*frame.GetID()+10000)
+            for frame_id in frame_ids:
+                correspondence = point_obj.GetFrame(frame_id)
+                if correspondence != None:
+                    _, uv, _ =  correspondence
+                    self.add_edge(point_id=point_id, pose_id=frame_id, measurement=uv,  edge_id=point_id*frame_id+10000000)
 
         # run the optimization
         self.optimize()

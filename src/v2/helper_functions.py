@@ -365,12 +365,17 @@ def MakeHomogeneous(x):
 
 
 def CameraProjectionMatrix(R, t, K):
-    return K @ np.concatenate((R, t), axis=1)
+    rotation_mat = R.T
+    translationVec = -t.T@R.T
+    
+    return  (np.concatenate((rotation_mat, translationVec), axis=0) @ K).T
+    #return K.T @ np.concatenate((R.T, t), axis=1)
     #return np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 
 
 def CameraProjectionMatrix2(Pose, K):
-    return K @ np.concatenate( (np.eye(3), np.zeros((3,1)) ), axis=1) @ Pose
+    return K@Pose[0:3,:]# (Pose.T[:,:3]@K.T).T
+    #return K @ np.concatenate( (np.eye(3), np.zeros((3,1)) ), axis=1) @ Pose
     #return np.concatenate((np.dot(K,R),np.dot(K,t)), axis = 1)
 
 

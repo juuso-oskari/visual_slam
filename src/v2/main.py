@@ -179,9 +179,11 @@ if __name__=="__main__":
         kp_cur, features_cur, rgb_cur = cur_frame.process_frame(feature_extractor=feature_extractor) # This returns keypoints as numpy.ndarray
         # Get keypoints and features in the last key frame corresponding to known 3D-points
         kp_prev, features_prev, known_3d, point_IDs = local_map.GetImagePointsWithFrameID(last_keyframe.GetID()) # This returns keypoints as numpy.ndarray
+        print("\nTracking " + str(len(known_3d)) + " points\n")
         matches,  preMatchedPoints, preMatchedFeatures, curMatchedPoints, curMatchedFeatures = feature_matcher.match_features(kp_prev, features_prev, kp_cur, features_cur)
-        # get 3d locations of feature points matched in the new frame
+        # get 3d locations and their ids in map of feature points matched in the new frame
         known_3d_matched = np.array([known_3d[m[0].queryIdx] for m in matches])
+        known_3d_matched_ids = [point_IDs[m[0].queryIdx] for m in matches]
         
         # TODO: possibly give previous rvec and tvec as initial guesses
         W_T_prev = local_map.GetFrame(id_frame_local-1).GetPose()
@@ -189,10 +191,10 @@ if __name__=="__main__":
         rvec_guess = Rtorvec(W_T_prev[0:3,0:3]) # use previous estimates as initial guess to help in computational efficiency
         tvec_guess = W_T_prev[0:3,3]
         #print("RÄNSÄCKKI lasketaan N pisteen perusteella", len(known_3d_matched))
-        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
-                                                        #rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]),
+                                                        rvec=rvec_guess.copy(), tvec=tvec_guess.copy(), useExtrinsicGuess=True)#, rvec=rvec_guess, tvec=tvec_guess, useExtrinsicGuess=True)
         #retval, rvec, tvec = cv2.solvePnP(objectPoints=known_3d_matched[:,np.newaxis,:].astype(np.float32), imagePoints=curMatchedPoints[:,np.newaxis,:].astype(np.float32), cameraMatrix=K, distCoeffs=np.array([]))
-        #tvec = tvec[:,np.newaxis]
+        tvec = tvec[:,np.newaxis]
         
         T = transformMatrix(rvec, tvec)
         r, t = T[:3, :3], np.asarray(T[:3, -1]).squeeze()
@@ -206,8 +208,8 @@ if __name__=="__main__":
         local_map.AddPointToFrameCorrespondences(point_ids = [point_IDs[m[0].queryIdx] for m in matches], image_points = curMatchedPoints, descriptors = curMatchedFeatures, frame_obj = cur_frame)
         
         # TODO: Do motion only bundle adjustement with local map
-        #localBA = BundleAdjustment(camera)
-        #localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
+        localBA = BundleAdjustment(camera)
+        localBA.motionOnlyBundleAdjustement(local_map, scale=False, save=True)
         #viewer2.update_pose(pose = g2o.Isometry3d(local_map.GetFrame(id_frame_local).GetPose()), cloud = None, colour=np.array([[0],[0],[0]]).T)
         viewer2.update_image(cv2.resize(cv2.drawMatchesKnn(last_keyframe.rgb, Numpy2Keypoint(kp_prev), rgb_cur, Numpy2Keypoint(kp_cur), matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS), None, fx=.6, fy=.6))
         # increment local frame id
@@ -225,7 +227,7 @@ if __name__=="__main__":
             # Update global map by adding new keyframe 
             map.AddParentAndPose(parent_id = id_frame-1, frame_id = id_frame, frame_obj = cur_frame, rel_pose_trans = prev_key_T_W @ W_T_cur_key, pose = W_T_cur_key)
             # Add Point frame correspondance
-            map.AddPointToFrameCorrespondences(point_ids = [point_IDs[m[0].queryIdx] for m in matches], image_points = curMatchedPoints, descriptors = curMatchedFeatures, frame_obj = cur_frame)
+            map.AddPointToFrameCorrespondences(point_ids = known_3d_matched_ids, image_points = curMatchedPoints, descriptors = curMatchedFeatures, frame_obj = cur_frame)
             # Remove outlier map points that are observed in fewer than 3 key frames
             #map.DiscardOutlierMapPoints(n_visible_frames=3)
             # TODO: Feature mathing between frames frame_id-1 and frame_id with unmatched points ie not with points that are already in the map
@@ -253,19 +255,22 @@ if __name__=="__main__":
             """
            
             # poses of two keyframes (4x4 matrices) : from World to Camera Frame
-            p1 = map.GetFrame(id_frame-1).GetPose()
-            p2 = map.GetFrame(id_frame).GetPose()
+            #p1 = map.GetFrame(id_frame-1).GetPose()
+            #p2 = map.GetFrame(id_frame).GetPose()
+            p1 = Isometry3d(R=map.GetFrame(id_frame-1).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame-1).GetPose()[:3, -1]).squeeze()).inverse().matrix()
+            p2 = Isometry3d(R=map.GetFrame(id_frame).GetPose()[0:3, 0:3], t=np.asarray(map.GetFrame(id_frame).GetPose()[:3, -1]).squeeze()).inverse().matrix()
             # projection matrices (3x4)
-            Proj1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
-            Proj2 = CameraProjectionMatrix(R = p2[0:3, 0:3], t = p2[:3, 3:], K = K)
+            #Proj1 = CameraProjectionMatrix(R = p1[0:3, 0:3], t = p1[:3, 3:], K = K)
+            #Proj2 = CameraProjectionMatrix(R = p2[0:3, 0:3], t = p2[:3, 3:], K = K)
+            Proj1 = CameraProjectionMatrix2(Pose=p1, K=K)
+            Proj2 = CameraProjectionMatrix2(Pose=p2, K=K)
             # triangulated points (Nx4) 
             x1 = MakeHomogeneous(last_keyframe_points) # matched image points in map.GetFrame(id_frame-1)
             x2 = MakeHomogeneous(cur_keyframe_points) # matched image points in map.GetFrame(id_frame)
-            new_triagulated_points = triangulate_points_course(P1 = Proj1, P2 = Proj2, x1s = x1, x2s = x2)
-            print(np.shape(new_triagulated_points))
-            # Normalizing
-            new_triagulated_points /= new_triagulated_points[:,3:]
             
+            
+            #new_triagulated_points = triangulate_points_course(P1 = Proj1, P2 = Proj2, x1s = x1, x2s = x2)
+        
             
             
             # TODO: Fix triangulate, most likely a scaling issue, since new points are drawn as rays on concecutive updates of viewer (same point different scaling)
@@ -273,20 +278,32 @@ if __name__=="__main__":
             #new_triagulated_points = triangulateCpp(proj1 = p1, proj2 = p2, pts1 = x1, pts2 = x2)
             #new_triagulated_points /= new_triagulated_points[:,3:]
             # Geohot style
-            #new_triagulated_points = triangulate(pose1 = P1, pose2 = P2, pts1 = x1, pts2 = x2)
-            #new_triagulated_points /= -new_triagulated_points[:,3:]
+            new_triagulated_points = triangulate(pose1 = Proj1, pose2 = Proj2, pts1 = x1, pts2 = x2)
+            new_triagulated_points /= new_triagulated_points[:,3:]
             # OpenCV style
-            #new_triagulated_points = cv2.triangulatePoints(projMatr1=(P1).astype(np.float32), projMatr2=(P2).astype(np.float32), projPoints1=(x1[:,:2].T).astype(np.float32), projPoints2=(x2[:,:2].T).astype(np.float32))
+            #new_triagulated_points = cv2.triangulatePoints(projMatr1=(Proj1).astype(np.float), projMatr2=(Proj2).astype(np.float), projPoints1=(x1[:,:2].T).astype(np.float), projPoints2=(x2[:,:2].T).astype(np.float))
             #new_triagulated_points /= new_triagulated_points[3]
             #new_triagulated_points = new_triagulated_points.T
             
             proj1 = p1 @ new_triagulated_points.T
             proj2 = p2 @ new_triagulated_points.T
             
+            proj_img1 = Proj1 @ new_triagulated_points.T
+            proj_img2 = Proj2 @ new_triagulated_points.T
+            proj_img2 /= proj_img2[2]
+            
+            print("Projecting back to new camera frame (not image plane)")
+            print(proj2.T[:10])
+            
+            print("Projecting to image plane")
+            print(proj_img2.T[:10])
+            print("Original matches in image plane")
+            print(x2[:10])
+            
             
             new_triagulated_points = new_triagulated_points[:,:3]
             # cherilarity check (positive depth when projected)
-            good_points_idx = np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] < 1) & (proj1[2] < 10))[0]
+            good_points_idx =  np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] < 1) & (proj1[2] < 1))[0] #range(len(new_triagulated_points))#np.where( (proj1[2] > 0) & (proj2[2] > 0) & (proj2[2] < 1) & (proj1[2] < 1))[0]
             # just for visualization
             new_points_ids = []
             for pt, uv1, uv2, ft1, ft2 in zip(new_triagulated_points[good_points_idx], last_keyframe_points[good_points_idx], cur_keyframe_points[good_points_idx], last_keyframe_features[good_points_idx], cur_keyframe_features[good_points_idx]):
@@ -300,7 +317,7 @@ if __name__=="__main__":
             
             # TODO: Bundle adjustement
             BA = BundleAdjustment(camera)
-            BA.localBundleAdjustement(map, last_keyframe_id=id_frame)
+            BA.localBundleAdjustement(map)
             # update viewer with new pose and new points (both optimized)
             #print(np.shape(map.GetAll3DPoints()))
             #viewer.stop()

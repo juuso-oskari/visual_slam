@@ -18,7 +18,7 @@ class Map:
         point_id_list = []
         for point_obj in self.points_3d.values():
             visibility = [point_obj.IsVisibleTo(frame_id) for frame_id in frame_id_list]
-            print(visibility)
+            #print(visibility)
             if all(visibility):
                 point_id_list.append(point_obj.GetID())
         return point_id_list
