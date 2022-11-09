@@ -220,6 +220,8 @@ if __name__=="__main__":
             W_T_prev_key = map.GetFrame(id_frame-1).GetPose() # Get last keyframe pose from global map
             prev_key_T_W = Isometry3d(R=W_T_prev_key[0:3,0:3], t=np.asarray(W_T_prev_key[:3, -1]).squeeze()).inverse().matrix()
             W_T_cur_key = local_map.GetFrame(id_frame_local).GetPose() # get optimized pose from local map
+            # Clear tracking frame from the parents
+            cur_frame.ClearParent()
             # Update global map by adding new keyframe 
             map.AddParentAndPose(parent_id = id_frame-1, frame_id = id_frame, frame_obj = cur_frame, rel_pose_trans = prev_key_T_W @ W_T_cur_key, pose = W_T_cur_key)
             # Add Point frame correspondance
@@ -298,7 +300,7 @@ if __name__=="__main__":
             
             # TODO: Bundle adjustement
             BA = BundleAdjustment(camera)
-            BA.localBundleAdjustement(map)
+            BA.localBundleAdjustement(map, last_keyframe_id=id_frame)
             # update viewer with new pose and new points (both optimized)
             #print(np.shape(map.GetAll3DPoints()))
             #viewer.stop()

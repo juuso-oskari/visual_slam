@@ -118,9 +118,16 @@ class BundleAdjustment(g2o.SparseOptimizer):
     def get_point(self, point_id):
         return self.vertex(point_id * 2 + 1).estimate()
 
-    def localBundleAdjustement(self, map, scale=False):
+    #  The local bundle adjustment refines the pose of the current key frame, the poses of connected key frames, and all the map points observed in these key frames.
+    # So we need to update only poses of the last two keyframes added to map (last_keyframe_id), and the 3d points seen by these two keyframes
+    def localBundleAdjustement(self, map, last_keyframe_id=None, scale=False):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
+        # if last_keyframe_id argument is given, do only local
+        if last_keyframe_id != None:
+            frame_ids = [last_keyframe_id-1, last_keyframe_id]
+            point_ids = map.GetPointsVisibleToFrames(frame_ids)
+        
         for frame_id in frame_ids:
             frame_obj = map.GetFrame(frame_id)
             if(frame_id== 0):
@@ -135,6 +142,7 @@ class BundleAdjustment(g2o.SparseOptimizer):
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)
             self.add_point(point_id=point_id, point=point_obj.Get3dPoint())
+
             for frame, uv, descriptor in point_obj.frames:
                 self.add_edge(point_id=point_id, pose_id=frame.GetID(), measurement=uv,  edge_id=point_id*frame.GetID()+10000000)
         # run the optimization

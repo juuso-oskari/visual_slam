@@ -14,7 +14,15 @@ class Map:
             raise Exception("Duplicate frame warning")
         self.frames[frame_id] = frame 
 
-
+    def GetPointsVisibleToFrames(self, frame_id_list):
+        point_id_list = []
+        for point_obj in self.points_3d.values():
+            visibility = [point_obj.IsVisibleTo(frame_id) for frame_id in frame_id_list]
+            print(visibility)
+            if all(visibility):
+                point_id_list.append(point_obj.GetID())
+        return point_id_list
+    
     # Get image points and corresponding descriptors
     # Returns list of tuples (uv, feat)
     def GetImagePointsWithFrameID(self, frame_id):

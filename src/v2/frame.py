@@ -67,6 +67,10 @@ class Frame:
         # keyframe flag, determines if the 
         self.keyframe = False
 
+    # clears parents, useful when adding new keyframe to global map, since we do not want to include tracking frames as parents
+    def ClearParent(self):
+        self.parents = {}
+
     # AddParent adds parent frame to frame class. Parent frame is added as {parent_id : transition between parent and current frame} key-value pair
     def AddParent(self, parent_frame_id, transition):
         self.parents[parent_frame_id] = transition
