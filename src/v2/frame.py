@@ -5,6 +5,7 @@ from copy import deepcopy
 class FeatureExtractor:
     def __init__(self):
         self.extractor = cv2.SIFT_create()
+        #self.extractor = cv2.ORB_create()
         
     def compute_features(self, img):
         pts = cv2.goodFeaturesToTrack(np.mean(img, axis=2).astype(np.uint8), 3000, qualityLevel=0.01, minDistance=7)
