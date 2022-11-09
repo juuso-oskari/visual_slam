@@ -37,6 +37,7 @@ class Point:
         for frame, uv, descriptor in self.frames:
             if (frame_id == frame.ID):
                 return (uv, descriptor)
+        return None
             
     def Get3dPoint(self):
         return self.location_3d

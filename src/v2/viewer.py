@@ -102,6 +102,7 @@ class Viewer(object):
 
             # Show mappoints
             if not self.map_queue.empty():
+                mappoints = DynamicArray(shape=(3,))
                 pts, code = self.map_queue.get()
                 if code == 1:  # append new points extend mappoints->314, pts->(229, 3), type=<class 'list'>
                     mappoints.extend(pts)
@@ -166,7 +167,7 @@ class DynamicArray2(object):
             shape = (shape,)
         assert isinstance(shape, tuple)
 
-        self.data = np.zeros((1000, *shape))
+        self.data = np.zeros((10000, *shape))
         self.shape = shape
         self.ind = 0
 
@@ -215,7 +216,7 @@ class DynamicArray(object):
         if isinstance(shape, int):
             shape = (shape,)
         assert isinstance(shape, tuple)
-        self.data = np.zeros((1000, *shape))
+        self.data = np.zeros((10000, *shape))
         self.shape = shape
         self.ind = 0
 

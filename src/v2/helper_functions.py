@@ -315,6 +315,14 @@ def triangulateCpp(proj1, proj2, pts1, pts2):
 # Returns indexes that are not in kp2
 def GetListDiff(kp1, kp2):
     #set2 = set(kp2)
+    idx_list = []
+    for i,x in enumerate(kp1):
+        found = False
+        for kp in kp2:
+            if(x[0]==kp[0] and x[1]==kp[1]):
+                found = True
+        if not found:    
+            idx_list.append(i)
     return [i for i,x in enumerate(kp1) if x not in kp2]
 
 

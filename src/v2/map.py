@@ -23,14 +23,16 @@ class Map:
         locations_3d = []
         point_Ids = []
         for point_obj in self.points_3d.values():
-            # get image points from tuple
-            image_points.append(point_obj.GetImagePoint(frame_id)[0])  
-            # get descriptor from tuple
-            descriptors.append(point_obj.GetImagePoint(frame_id)[1]) 
-            # get the known 3d location
-            locations_3d.append(point_obj.Get3dPoint())
-            # get point ID
-            point_Ids.append(point_obj.GetID()) 
+            imgpoints_and_features = point_obj.GetImagePoint(frame_id)
+            if imgpoints_and_features != None: # if the point is seen indeed
+                # get image points from tuple
+                image_points.append(point_obj.GetImagePoint(frame_id)[0])  
+                # get descriptor from tuple
+                descriptors.append(point_obj.GetImagePoint(frame_id)[1]) 
+                # get the known 3d location
+                locations_3d.append(point_obj.Get3dPoint())
+                # get point ID
+                point_Ids.append(point_obj.GetID()) 
         return np.array(image_points), np.array(descriptors), np.array(locations_3d), np.array(point_Ids)
     
     # Returns 3c locations of points with id on id_list
