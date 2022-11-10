@@ -18,6 +18,7 @@ from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import graphslam
+from geohot_BA import *
 np.set_printoptions(suppress=True)
 
 class Camera:
@@ -59,7 +60,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/juuso"
+    cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
