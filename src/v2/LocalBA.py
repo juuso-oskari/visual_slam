@@ -20,7 +20,7 @@ def localBundleAdjustement(BA, KeyFrames):
 class BundleAdjustment(g2o.SparseOptimizer):
     def __init__(self, camera):
         super().__init__()
-        solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
+        solver = g2o.BlockSolverSE3(g2o.LinearSolverCholmodSE3())
         solver = g2o.OptimizationAlgorithmLevenberg(solver)
         super().set_algorithm(solver)
         # TODO: understand how to get focal length from x y
@@ -73,6 +73,8 @@ class BundleAdjustment(g2o.SparseOptimizer):
         v_p.set_fixed(fixed)
         if self.vertex(point_id * 2 + 1) == None:
             super().add_vertex(v_p)
+        else:
+            print("WARNING: tried to add already existing point!")
 
     def add_edge(self, point_id, pose_id, 
             measurement, edge_id,
@@ -110,22 +112,42 @@ class BundleAdjustment(g2o.SparseOptimizer):
             edge.set_robust_kernel(robust_kernel)
         super().add_edge(edge)
     
+    def AddScalingEdge(self, parent_id, child_id, measurement, information=np.eye(1), robust_kernel=g2o.RobustKernelDCS()):
+        edge = g2o.EdgeSBAScale()
+        vertices = [parent_id, child_id]
+        for i, v in enumerate(vertices):
+            if isinstance(v, int):
+                v = self.vertex(v*2)
+            edge.set_vertex(i, v)
+
+        #edge.set_vertex(0, self.vertex(parent_id ))
+        #edge.set_vertex(1, self.vertex(child_id ))
+        
+        edge.set_measurement(np.linalg.norm(g2o.Isometry3d(measurement).position()))  # relative pose transformation between frames
+        edge.set_information(information)
+        edge.set_parameter_id(0,0)
+        if robust_kernel is not None:
+            edge.set_robust_kernel(robust_kernel)
+        super().add_edge(edge)
     
     
     def get_pose(self, pose_id):
         return self.vertex(pose_id * 2).estimate()
 
     def get_point(self, point_id):
+        print(self.vertex(point_id * 2 + 1).estimate())
         return self.vertex(point_id * 2 + 1).estimate()
 
     #  The local bundle adjustment refines the pose of the current key frame, the poses of connected key frames, and all the map points observed in these key frames.
     # So we need to update only poses of the last two keyframes added to map (last_keyframe_id), and the 3d points seen by these two keyframes
-    def localBundleAdjustement(self, map, last_keyframe_id=None, scale=False):
+    def localBundleAdjustement(self, map, last_keyframe_id=None, scale=False, BAwindow = 5):
         frame_ids = map.frames.keys()
         point_ids = map.points_3d.keys()
         # if last_keyframe_id argument is given, do only local
         if last_keyframe_id != None:
-            frame_ids = [last_keyframe_id-1, last_keyframe_id]
+            #frame_ids = [last_keyframe_id-1, last_keyframe_id]
+            # get frames in BAwindow
+            
             point_ids = map.GetPointsVisibleToFrames(frame_ids)
         
         for frame_id in frame_ids:
@@ -134,10 +156,10 @@ class BundleAdjustment(g2o.SparseOptimizer):
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose(), fixed=True) # set initial frame as fixed (origo)
             else:
                 self.add_pose(pose_id=frame_id, pose = frame_obj.GetPose())
-                #for parent_ID in frame_obj.GetParentIDs():
+                for parent_ID in frame_obj.GetParentIDs():
                     # add edge between parent and current frame (usually previous and current frame, with loop closure as exception)
                     # self.add_edge_between_poses(parent_id = parent_ID, child_id = frame_id, measurement=frame_obj.GetTransitionWithParentID(parent_ID))
-                    
+                    self.AddScalingEdge(parent_id = parent_ID, child_id = frame_id, measurement=frame_obj.GetTransitionWithParentID(parent_ID))
             
         for point_id in point_ids:
             point_obj = map.GetPoint(point_id)

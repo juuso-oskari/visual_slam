@@ -60,7 +60,7 @@ if __name__=="__main__":
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
-    cur_dir = "/home/jere"
+    cur_dir = "/home/juuso"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
@@ -168,6 +168,7 @@ if __name__=="__main__":
     loop_idx = i # continue where map initialization left off
     print("last keyframe idx", i)
     
+    
 
     for i in range(loop_idx+1, 1000):
         print("Image index: ", i)
@@ -230,7 +231,8 @@ if __name__=="__main__":
             # Add Point frame correspondance
             map.AddPointToFrameCorrespondences(point_ids = known_3d_matched_ids, image_points = curMatchedPoints, descriptors = curMatchedFeatures, frame_obj = cur_frame)
             # Remove outlier map points that are observed in fewer than 3 key frames
-            #map.DiscardOutlierMapPoints(n_visible_frames=3)
+            if id_frame >= 6 and id_frame%4 == 0:
+                map.DiscardOutlierMapPoints(n_visible_frames=3)
             # TODO: Feature mathing between frames frame_id-1 and frame_id with unmatched points ie not with points that are already in the map
             image_points_already_in_map = map.GetImagePointsWithFrameID(id_frame-1)[0] # this contains matched (=mapped) image points
             
