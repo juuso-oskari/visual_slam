@@ -56,15 +56,21 @@ if __name__=="__main__":
     #fx, fy, cx, cy = 481.20, 480.0, 319.5, 239.5
     K = np.matrix([[535.4, 0, 320.1], [0, 539.2, 247.6], [0, 0, 1]])  # camera intrinsic parameters
     fx, fy, cx, cy = 535.4, 539.2, 320.1, 247.6
-    
+
+    # camera parameter KITTI
+    #fx, fy, cx, cy  = 527.9990706330082, 527.963495807245, 399.18451401412665, 172.8193108347693
+    #K = np.matrix([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])  # camera intrinsic parameters
     # Filepaths
     rgb_images = os.listdir("data/rgbd_dataset_freiburg3_long_office_household/rgb")
+    #rgb_images = os.listdir("data/recording_2020-03-26_13-32-55/undistorted_images/cam0")
     rgb_images.sort(key=lambda f: int(re.sub('\D', '', f)))
     cur_dir = "/home/jere"
     dir_rgb = cur_dir + "/visual_slam/data/rgbd_dataset_freiburg3_long_office_household/rgb/"
+    #dir_rgb = cur_dir + "/visual_slam/data/recording_2020-03-26_13-32-55/undistorted_images/cam0/"
+
     dir_depth = cur_dir + "/visual_slam/data/ICL_NUIM/depth/"
     fp_rgb = dir_rgb + rgb_images[0] #str(1) + ".png"
-    print(fp_rgb)
+    print(np.shape(fp_rgb))
     fp_depth = dir_depth + str(1) + ".png"
 
     # Initializations of classes
@@ -238,6 +244,7 @@ if __name__=="__main__":
             
             kp1 = map.GetFrame(id_frame-1).GetKeyPoints() # this contains all the image points (matched and unmatched)
             desc1 = map.GetFrame(id_frame-1).GetFeatures()
+            # TODO: Here should be implmeted duplicate remocal better. 
             idx = GetListDiff(kp1, image_points_already_in_map) # get unmatched points from previous keyframe, TODO: should it be keyframes
             kp1 = kp1[idx]
             desc1 = desc1[idx]

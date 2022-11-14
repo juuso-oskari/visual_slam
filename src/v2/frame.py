@@ -51,7 +51,8 @@ class FeatureMatcher():
 class Frame:
     def __init__(self, rgb_fp, id):
         # Image related attributes
-        self.rgb = cv2.imread(rgb_fp)
+        self.rgb = cv2.imread(rgb_fp)# [0:300,:,:]
+        #print(np.shape(cv2.imread(rgb_fp)[0:300,:,:]))
         #self.depth = cv2.imread(d_path)
         self.keypoints, self.features  = None, None
         #self.feature_extractor = feature_extractor
