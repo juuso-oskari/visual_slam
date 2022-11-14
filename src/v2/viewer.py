@@ -122,13 +122,15 @@ class Viewer(object):
 
             gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+            #gl.glClearColor(0.0, 0.0, 0.0, 1.0)
             dcam.Activate(scam)
             # draw axis
             axis.Render()
             # draw current camera
             if camera is not None:
                 gl.glLineWidth(1)
-                gl.glColor3f(0.0, 0.0, 1.0)
+                #gl.glColor3f(0.0, 0.0, 1.0)
+                gl.glColor3f(0.0, 1.0, 0.0)
                 pangolin.DrawCameras(np.array([camera]), 0.03)
 
             # show trajectory
